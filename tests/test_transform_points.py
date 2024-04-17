@@ -1,5 +1,6 @@
 import pytest
 from vyperdatum.transformer import Transformer
+from vyperdatum.npz import NPZ
 
 
 def test_6349_to_6319():
@@ -16,3 +17,17 @@ def test_6349_to_6319():
     assert pytest.approx(x, abs=.01) == coords_lat_lon[0], "x coordinate should remain unchanged."
     assert pytest.approx(y, abs=.01) == coords_lat_lon[1], "y coordinate should remain unchanged."
     assert pytest.approx(z, abs=.01) == -33.29, "incorrect z coordinate transformation."
+
+
+@pytest.mark.parametrize("fname", [
+    r"N:\HSD\Projects\NBS\NBS_Data_Qualified\PBC_Northeast_UTM19N_MLLW\USACE\eHydro_NewEngland_CENAE\Processed\CENAE_DIS_MA_32_GRE_20231005_BD_066\MA_32_GRE_20231005_BD_066_FULL.bruty.npz",
+    r"N:\HSD\Projects\NBS\NBS_Data_Qualified\PBC_Northeast_UTM19N_MLLW\JALBTCX\DEM\Processed\2018_NCMP_MA_19TCF7076_BareEarth_1mGrid.bruty.npz"
+])
+def test_npz(fname):
+    npz = NPZ(fname)
+    x, y, z, u = npz.xyzu()
+    wkt = npz.wkt()
+    mmx, mmy, mmz, mmu = npz.minmax()
+    assert x.shape == y.shape == z.shape == u.shape, f"inconsistent data array dimensions in npz file: {fname}"  # noqa: E501
+    assert mmx.shape == mmy.shape == mmz.shape == mmu.shape, f"inconsistent minmax array dimensions in npz file: {fname}"  # noqa: E501
+    assert isinstance(wkt, str), f"unexpected wkt type in npz file: {fname}"

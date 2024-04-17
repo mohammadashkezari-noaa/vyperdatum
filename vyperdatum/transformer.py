@@ -1,8 +1,11 @@
+import os
+import pathlib
 import logging
 from typing import Union, Optional
 import pyproj as pp
 from pyproj._transformer import AreaOfInterest
 import numpy as np
+from osgeo import gdal
 
 
 logger = logging.getLogger("root_logger")
@@ -111,3 +114,36 @@ class Transformer():
             logger.exception("Error while running the point transformation.")
         return xt, yt, zt
 
+    def transform_raster(self,
+                         input_file: str,
+                         output_file: str
+                         ):
+        """
+        Transform the gdal-supported input rater file (`input_file`) and store the
+        transformed file on the local disk (`output_file`).
+
+        Raises
+        -------
+        ValueError:
+            If `.crs_input` or `.crs_output` is not set.
+        FileNotFoundError:
+            If the input raster file is not found.
+
+        Parameters
+        -----------
+        input_file: str
+            Path to the input raster file (gdal supported).
+        output_file: str
+            Path to the transformed raster file.
+        """
+        if not (isinstance(self.crs_from, pp.CRS) & isinstance(self.crs_to, pp.CRS)):
+            raise ValueError(("The `.crs_input` and `.crs_output` attributes"
+                              "must be set with `pyproj.CRS` type values.")
+                             )
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(f"The input raster file not found at {input_file}.")
+
+        if pathlib.Path(str(input_file).lower()).suffix == '.bag':
+            raise NotImplementedError("BAG transformation not implemented yet!")
+        # see warp options: https://gdal.org/api/python/utilities.html#osgeo.gdal.WarpOptions
+        return gdal.Warp(output_file, input_file, dstSRS=self.crs_to, srcSRS=self.crs_from)
