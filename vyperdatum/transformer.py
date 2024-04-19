@@ -16,18 +16,9 @@ class Transformer():
     """
     def __init__(self,
                  crs_from: Union[pp.CRS, int, str],
-                 crs_to: Union[pp.CRS, int, str],
-                 always_xy: bool = False,
-                 area_of_interest: Optional[AreaOfInterest] = None,
-                 authority: Optional[str] = None,
-                 accuracy: Optional[float] = None,
-                 allow_ballpark: Optional[bool] = False,
-                 force_over: bool = False,
-                 only_best: Optional[bool] = True
+                 crs_to: Union[pp.CRS, int, str]
                  ) -> None:
         """
-
-        .. Parameter description adopted from pyproj :class:`Transformer`
 
         Parameters
         ----------
@@ -35,6 +26,40 @@ class Transformer():
             Projection of input data.
         crs_to: pyproj.crs.CRS or input used to create one
             Projection of output data.
+        """
+
+        if not isinstance(crs_from, pp.CRS):
+            crs_from = pp.CRS(crs_from)
+        if not isinstance(crs_to, pp.CRS):
+            crs_to = pp.CRS(crs_to)
+        self.crs_from = crs_from
+        self.crs_to = crs_to
+
+    def transform_points(self,
+                         x: Union[float, int, list, np.ndarray],
+                         y: Union[float, int, list, np.ndarray],
+                         z: Union[float, int, list, np.ndarray],
+                         always_xy: bool = False,
+                         area_of_interest: Optional[AreaOfInterest] = None,
+                         authority: Optional[str] = None,
+                         accuracy: Optional[float] = None,
+                         allow_ballpark: Optional[bool] = False,
+                         force_over: bool = False,
+                         only_best: Optional[bool] = True                         
+                         ):
+        """
+        Conduct point transformation between two coordinate reference systems.
+
+        .. Some of the parameter descriptions adopted from pyproj :class:`Transformer`
+
+        Parameters
+        ----------
+        x: numeric scalar or array
+           Input x coordinate(s).
+        y: numeric scalar or array
+           Input y coordinate(s).
+        z: numeric scalar or array, optional
+           Input z coordinate(s).
         always_xy: bool, default=False
             If true, the transform method will accept as input and return as output
             coordinates using the traditional GIS order, that is longitude, latitude
@@ -73,46 +98,29 @@ class Transformer():
             Requires PROJ 9.2+.
         """
 
-        if not isinstance(crs_from, pp.CRS):
-            crs_from = pp.CRS(crs_from)
-        if not isinstance(crs_to, pp.CRS):
-            crs_to = pp.CRS(crs_to)
-        self.crs_from = crs_from
-        self.crs_to = crs_to
-        self.transformer = pp.Transformer.from_crs(crs_from=self.crs_from,
-                                                   crs_to=self.crs_to,
-                                                   always_xy=always_xy,
-                                                   area_of_interest=area_of_interest,
-                                                   authority=authority,
-                                                   accuracy=accuracy,
-                                                   allow_ballpark=allow_ballpark,
-                                                   force_over=force_over,
-                                                   only_best=only_best
-                                                   )
-
-    def transform_points(self,
-                         x: Union[float, int, list, np.ndarray],
-                         y: Union[float, int, list, np.ndarray],
-                         z: Union[float, int, list, np.ndarray]
-                         ):
-        """
-        Conduct point transformation between two coordinate reference systems.
-
-        Parameters
-        ----------
-        x: numeric scalar or array
-           Input x coordinate(s).
-        y: numeric scalar or array
-           Input y coordinate(s).
-        z: numeric scalar or array, optional
-           Input z coordinate(s).
-        """
         try:
             xt, yt, zt = None, None, None
-            xt, yt, zt = self.transformer.transform(x, y, z)
+            transformer = pp.Transformer.from_crs(crs_from=self.crs_from,
+                                                  crs_to=self.crs_to,
+                                                  always_xy=always_xy,
+                                                  area_of_interest=area_of_interest,
+                                                  authority=authority,
+                                                  accuracy=accuracy,
+                                                  allow_ballpark=allow_ballpark,
+                                                  force_over=force_over,
+                                                  only_best=only_best
+                                                  )
+            xt, yt, zt = transformer.transform(x, y, z)
         except Exception:
             logger.exception("Error while running the point transformation.")
         return xt, yt, zt
+
+    @staticmethod
+    def gdal_extensions():
+        return sorted(
+            ["." + gdal.GetDriver(i).ShortName.lower() for i in range(gdal.GetDriverCount())]
+            + [".tif", ".tiff"]
+            )
 
     def transform_raster(self,
                          input_file: str,
@@ -143,7 +151,7 @@ class Transformer():
         if not os.path.isfile(input_file):
             raise FileNotFoundError(f"The input raster file not found at {input_file}.")
 
-        if pathlib.Path(str(input_file).lower()).suffix == '.bag':
-            raise NotImplementedError("BAG transformation not implemented yet!")
+        if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
+            raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
         # see warp options: https://gdal.org/api/python/utilities.html#osgeo.gdal.WarpOptions
         return gdal.Warp(output_file, input_file, dstSRS=self.crs_to, srcSRS=self.crs_from)

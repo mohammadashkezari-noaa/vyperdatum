@@ -20,8 +20,8 @@ def test_6349_to_6319():
 
 
 @pytest.mark.parametrize("fname", [
-    r"N:\HSD\Projects\NBS\NBS_Data_Qualified\PBC_Northeast_UTM19N_MLLW\USACE\eHydro_NewEngland_CENAE\Processed\CENAE_DIS_MA_32_GRE_20231005_BD_066\MA_32_GRE_20231005_BD_066_FULL.bruty.npz",
-    r"N:\HSD\Projects\NBS\NBS_Data_Qualified\PBC_Northeast_UTM19N_MLLW\JALBTCX\DEM\Processed\2018_NCMP_MA_19TCF7076_BareEarth_1mGrid.bruty.npz"
+    r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\2018_NCMP_MA_19TCF2495_BareEarth_1mGrid_transformed.bruty.bruty.npz",
+    r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\W00405_MB_1m_MLLW_1of4_transformed.bruty.npz"
 ])
 def test_npz(fname):
     npz = NPZ(fname)
