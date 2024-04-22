@@ -15,6 +15,7 @@ class PROJDB(RootEnum):
     """
     FILE_NAME = "proj.db"
 
+    VIEW_CRS = "crs_view"
     TABLE_VERTICAL_CRS = "vertical_crs"
     TABLE_GRID_TRANS = "grid_transformation"
     TABLE_OTHER_TRANS = "other_transformation"

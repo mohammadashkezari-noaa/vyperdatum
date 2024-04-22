@@ -125,7 +125,7 @@ class Transformer():
     def transform_raster(self,
                          input_file: str,
                          output_file: str
-                         ):
+                         ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
         transformed file on the local disk (`output_file`).
@@ -143,6 +143,11 @@ class Transformer():
             Path to the input raster file (gdal supported).
         output_file: str
             Path to the transformed raster file.
+
+        Returns
+        --------
+        bool:
+            True is successful, otherwise False.
         """
         if not (isinstance(self.crs_from, pp.CRS) & isinstance(self.crs_to, pp.CRS)):
             raise ValueError(("The `.crs_input` and `.crs_output` attributes"
@@ -153,5 +158,14 @@ class Transformer():
 
         if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
             raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
-        # see warp options: https://gdal.org/api/python/utilities.html#osgeo.gdal.WarpOptions
-        return gdal.Warp(output_file, input_file, dstSRS=self.crs_to, srcSRS=self.crs_from)
+        try:
+            success = False
+            gdal.Warp(output_file,
+                      input_file,
+                      dstSRS=self.crs_to,
+                      srcSRS=self.crs_from,
+                      creationOptions=["COMPRESS=DEFLATE", "TILED=YES"]
+                      )
+            success = True
+        finally:
+            return success

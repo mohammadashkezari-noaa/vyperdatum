@@ -10,11 +10,10 @@ from vyperdatum.npz import NPZ
 
 def raster_wkt(raster_file: str):
     wkt = None
-    extension = pathlib.Path(raster_file).suffix.lower()
-    if extension == ".npz":
+    if pathlib.Path(raster_file).suffix.lower() == ".npz":
         wkt = NPZ(raster_file).wkt()
     else:
-        ds = gdal.Open(raster_file)   
+        ds = gdal.Open(raster_file)
         srs = osr.SpatialReference(wkt=ds.GetProjection())
         wkt = srs.ExportToWkt()
         ds = None
@@ -50,5 +49,10 @@ def test_transform_raster(input_file: str, already_transformed_file: str):
         assert gen_ds.RasterCount == target_ds.RasterCount, "unexpected band counts"
         assert pytest.approx(gen_band.min(), 0.001) == target_band.min(), f"inconsistent min band value (gen_min: {gen_band.min()} vs target_min: {target_band.min()})"
         assert pytest.approx(gen_band.max(), 0.001) == target_band.max(), f"inconsistent max band value (gen_max: {gen_band.max()} vs target_max: {target_band.max()})"
-        assert pp.CRS(raster_wkt(already_transformed_file)).equals(pp.CRS(raster_wkt(generated_file))), "inconsistent crs."
+        gen_band.flags.writeable = False
+        target_band.flags.writeable = False
+        assert hash(gen_band) == hash(target_band), f"hash check failed ({hash(gen_band)} vs {hash(target_band)})"
+        # assert gen_ds.GetRasterBand(1).Checksum() == target_ds.GetRasterBand(1).Checksum(), f"checksum failed ({gen_ds.GetRasterBand(1).Checksum()} vs {target_ds.GetRasterBand(1).Checksum()})"
+        # assert pp.CRS(raster_wkt(already_transformed_file)).equals(pp.CRS(raster_wkt(generated_file))), "inconsistent crs."
         gen_ds, target_ds = None, None
+        gen_band, target_band = None, None

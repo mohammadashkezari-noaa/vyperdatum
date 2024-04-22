@@ -121,6 +121,10 @@ class DB:
             SQL query (intended to be a scan query) to be executed.
         dataframe: bool, default=False
             If True, converts the result into a pandas dataframe.
+
+        Returns
+        --------
+        list or pd.DataFrame
         """
         try:
             con, cur, res = None, None, None
@@ -140,3 +144,44 @@ class DB:
             if con:
                 con.close()
         return res
+
+    def crs_by_keyword(self,
+                       keywords: list[str],
+                       dataframe: bool = False
+                       ) -> Union[Optional[list], Optional[pd.DataFrame]]:
+        """
+        Return a list (or dataframe) of CRS that their name or description
+        contain the passed keywords. The search is not case-sensitive.
+
+        Parameters
+        ----------
+        sql: str
+            SQL query (intended to be a scan query) to be executed.
+        keywords: list[str]
+            A list of string keywords used to query the database.
+        dataframe: bool, default=False
+            If True, converts the result into a pandas dataframe.
+
+        Raises
+        -------
+        TypeError:
+            If `keywords` is not a list of strings.
+        ValueError:
+            If no keywords is passed.
+
+        Returns
+        --------
+        list or pd.DataFrame
+        """
+        if not isinstance(keywords, list):
+            raise TypeError("keywords must be a list")
+        if not all(map(lambda k: isinstance(k, str), keywords)):
+            raise TypeError("keywords must be a list of strings")
+        if len(keywords) < 1:
+            raise ValueError("at least one keyword most be passed")
+        where = ""
+        filters = [f"(name like '%{k}%' OR description like '%{k}%')" for k in keywords]
+        if len(filters) > 0:
+            where = "WHERE " + " AND ".join(filters)
+        return self.query(sql=f"SELECT * FROM {enuPDB.VIEW_CRS.value} {where}",
+                          dataframe=dataframe)
