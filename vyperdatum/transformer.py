@@ -5,7 +5,8 @@ from typing import Union, Optional
 import pyproj as pp
 from pyproj._transformer import AreaOfInterest
 import numpy as np
-from osgeo import gdal
+from osgeo import gdal, osr, ogr
+from tqdm import tqdm
 
 
 logger = logging.getLogger("root_logger")
@@ -143,11 +144,13 @@ class Transformer():
             Path to the input raster file (gdal supported).
         output_file: str
             Path to the transformed raster file.
+        NotImplementedError:
+            If the input vector file is not supported by gdal.
 
         Returns
         --------
         bool:
-            True is successful, otherwise False.
+            True if successful, otherwise False.
         """
         if not (isinstance(self.crs_from, pp.CRS) & isinstance(self.crs_to, pp.CRS)):
             raise ValueError(("The `.crs_input` and `.crs_output` attributes"
@@ -168,4 +171,89 @@ class Transformer():
                       )
             success = True
         finally:
+            return success
+
+    def transform_vector(self,
+                         input_file: str,
+                         output_file: str
+                         ) -> bool:
+        """
+        Transform the gdal-supported input vector file (`input_file`) and store the
+        transformed file on the local disk (`output_file`).
+
+        Raises
+        -------
+        ValueError:
+            If `.crs_input` or `.crs_output` is not set.
+        FileNotFoundError:
+            If the input vector file is not found.
+        NotImplementedError:
+            If the input vector file is not supported by gdal.
+
+        Parameters
+        -----------
+        input_file: str
+            Path to the input vector file (gdal supported).
+        output_file: str
+            Path to the transformed vector file.
+
+        Returns
+        --------
+        bool:
+            True if successful, otherwise False.
+        """
+        try:
+            if not (isinstance(self.crs_from, pp.CRS) & isinstance(self.crs_to, pp.CRS)):
+                raise ValueError(("The `.crs_input` and `.crs_output` attributes"
+                                "must be set with `pyproj.CRS` type values.")
+                                )
+            if not os.path.isfile(input_file):
+                raise FileNotFoundError(f"The input vector file not found at {input_file}.")
+
+            if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
+                raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
+
+            pbar, success = None, False
+            ds = gdal.OpenEx(input_file)
+            driver = ogr.GetDriverByName(ds.GetDriver().ShortName)
+            inSpatialRef = osr.SpatialReference()
+            inSpatialRef.ImportFromWkt(self.crs_from.to_wkt())
+            outSpatialRef = osr.SpatialReference()
+            outSpatialRef.ImportFromWkt(self.crs_to.to_wkt())
+            coordTrans = osr.CoordinateTransformation(inSpatialRef, outSpatialRef)
+            inDataSet = driver.Open(input_file)
+            if os.path.exists(output_file):
+                driver.DeleteDataSource(output_file)
+            outDataSet = driver.CreateDataSource(output_file)
+            layer_count = inDataSet.GetLayerCount()
+            for layer_index in range(layer_count):
+                inLayer = inDataSet.GetLayer(layer_index)
+                outLayer = outDataSet.CreateLayer(inLayer.GetName(), geom_type=ogr.wkbMultiPolygon)
+                inLayerDefn = inLayer.GetLayerDefn()
+                for i in range(0, inLayerDefn.GetFieldCount()):
+                    fieldDefn = inLayerDefn.GetFieldDefn(i)
+                    outLayer.CreateField(fieldDefn)
+                outLayerDefn = outLayer.GetLayerDefn()
+                inFeature = inLayer.GetNextFeature()
+                feature_count = inLayer.GetFeatureCount()
+                pbar = tqdm(total=feature_count)
+                feature_counter = 0
+                while inFeature:
+                    geom = inFeature.GetGeometryRef()
+                    geom.Transform(coordTrans)
+                    outFeature = ogr.Feature(outLayerDefn)
+                    outFeature.SetGeometry(geom)
+                    for i in range(0, outLayerDefn.GetFieldCount()):
+                        outFeature.SetField(outLayerDefn.GetFieldDefn(i).GetNameRef(), inFeature.GetField(i))
+                    outLayer.CreateFeature(outFeature)
+                    outFeature = None
+                    inFeature = inLayer.GetNextFeature()
+                    feature_counter += 1
+                    pbar.update(1)
+                    pbar.set_description(f"Processing Layer {layer_index+1} / {layer_count}")
+            inDataSet, outDataSet, ds = None, None, None
+            success = True
+        finally:
+            if pbar:
+                pbar.close()
             return success

@@ -1,0 +1,7 @@
+# versions to be nailed down
+gdal
+pyproj
+numpy
+pandas
+pydantic
+tqdm
