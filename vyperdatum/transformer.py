@@ -3,6 +3,7 @@ import pathlib
 import logging
 from typing import Union, Optional
 import pyproj as pp
+from pyproj.transformer import TransformerGroup
 from pyproj._transformer import AreaOfInterest
 import numpy as np
 from osgeo import gdal, osr, ogr
@@ -17,9 +18,17 @@ class Transformer():
     """
     def __init__(self,
                  crs_from: Union[pp.CRS, int, str],
-                 crs_to: Union[pp.CRS, int, str]
+                 crs_to: Union[pp.CRS, int, str],
+                 always_xy: bool = False,
+                 area_of_interest: Optional[AreaOfInterest] = None,
+                 authority: Optional[str] = None,
+                 accuracy: Optional[float] = None,
+                 allow_ballpark: Optional[bool] = False,
+                 force_over: bool = False,
+                 only_best: Optional[bool] = True                 
                  ) -> None:
         """
+        .. Some of the parameter descriptions adopted from pyproj :class:`Transformer`
 
         Parameters
         ----------
@@ -27,40 +36,6 @@ class Transformer():
             Projection of input data.
         crs_to: pyproj.crs.CRS or input used to create one
             Projection of output data.
-        """
-
-        if not isinstance(crs_from, pp.CRS):
-            crs_from = pp.CRS(crs_from)
-        if not isinstance(crs_to, pp.CRS):
-            crs_to = pp.CRS(crs_to)
-        self.crs_from = crs_from
-        self.crs_to = crs_to
-
-    def transform_points(self,
-                         x: Union[float, int, list, np.ndarray],
-                         y: Union[float, int, list, np.ndarray],
-                         z: Union[float, int, list, np.ndarray],
-                         always_xy: bool = False,
-                         area_of_interest: Optional[AreaOfInterest] = None,
-                         authority: Optional[str] = None,
-                         accuracy: Optional[float] = None,
-                         allow_ballpark: Optional[bool] = False,
-                         force_over: bool = False,
-                         only_best: Optional[bool] = True                         
-                         ):
-        """
-        Conduct point transformation between two coordinate reference systems.
-
-        .. Some of the parameter descriptions adopted from pyproj :class:`Transformer`
-
-        Parameters
-        ----------
-        x: numeric scalar or array
-           Input x coordinate(s).
-        y: numeric scalar or array
-           Input y coordinate(s).
-        z: numeric scalar or array, optional
-           Input z coordinate(s).
         always_xy: bool, default=False
             If true, the transform method will accept as input and return as output
             coordinates using the traditional GIS order, that is longitude, latitude
@@ -99,29 +74,87 @@ class Transformer():
             Requires PROJ 9.2+.
         """
 
+        if not isinstance(crs_from, pp.CRS):
+            crs_from = pp.CRS(crs_from)
+        if not isinstance(crs_to, pp.CRS):
+            crs_to = pp.CRS(crs_to)
+        self.crs_from = crs_from
+        self.crs_to = crs_to
+
+        self.transformer_group = TransformerGroup(crs_from=self.crs_from,
+                                                  crs_to=self.crs_to,
+                                                  allow_ballpark=False
+                                                  )
+        if self.transformer_group.transformers < 1:
+            err_msg = ("No transformers identified for the following transformation:"
+                       f"\ncrs_from:{self.crs_from.name}\ncrs_to:{self.crs_to.name}")
+            logger.exception(err_msg)
+            raise ValueError(err_msg)
+
+        self.transformer = pp.Transformer.from_crs(crs_from=self.crs_from,
+                                                   crs_to=self.crs_to,
+                                                   always_xy=always_xy,
+                                                   area_of_interest=area_of_interest,
+                                                   authority=authority,
+                                                   accuracy=accuracy,
+                                                   allow_ballpark=allow_ballpark,
+                                                   force_over=force_over,
+                                                   only_best=only_best
+                                                   )
+
+    def transform_points(self,
+                         x: Union[float, int, list, np.ndarray],
+                         y: Union[float, int, list, np.ndarray],
+                         z: Union[float, int, list, np.ndarray],
+                         ):
+        """
+        Conduct point transformation between two coordinate reference systems.        
+
+        Parameters
+        ----------
+        x: numeric scalar or array
+           Input x coordinate(s).
+        y: numeric scalar or array
+           Input y coordinate(s).
+        z: numeric scalar or array, optional
+           Input z coordinate(s).
+        """
+
         try:
             xt, yt, zt = None, None, None
-            transformer = pp.Transformer.from_crs(crs_from=self.crs_from,
-                                                  crs_to=self.crs_to,
-                                                  always_xy=always_xy,
-                                                  area_of_interest=area_of_interest,
-                                                  authority=authority,
-                                                  accuracy=accuracy,
-                                                  allow_ballpark=allow_ballpark,
-                                                  force_over=force_over,
-                                                  only_best=only_best
-                                                  )
-            xt, yt, zt = transformer.transform(x, y, z)
+            xt, yt, zt = self.transformer.transform(x, y, z)
         except Exception:
             logger.exception("Error while running the point transformation.")
         return xt, yt, zt
 
     @staticmethod
     def gdal_extensions():
+        """
+        Return a lower-cased list of driver names supported by gdal.
+
+        Returns
+        -------
+        list[str]
+        """
         return sorted(
             ["." + gdal.GetDriver(i).ShortName.lower() for i in range(gdal.GetDriverCount())]
             + [".tif", ".tiff"]
             )
+    
+    @staticmethod
+    def raster_metadata(raster_file: str):
+        metadata = {}
+        ds = gdal.Open(raster_file, gdal.GA_ReadOnly)
+        metadata |= {"description": ds.GetDescription()}
+        metadata |= {"driver": ds.GetDriver().ShortName}
+        metadata |= {"bands": ds.RasterCount}
+        metadata |= {"dimensions": f"{ds.RasterXSize} x {ds.RasterYSize}"}
+        metadata |= {"band_descriptions": [ds.GetRasterBand(i+1).GetDescription() for i in range(ds.RasterCount)]}
+        metadata |= {"compression": ds.GetMetadata('IMAGE_STRUCTURE').get('COMPRESSION', None)}
+        metadata |= {"geo_transform": ds.GetGeoTransform()}
+        metadata |= {"wkt": ds.GetProjection()}
+        ds = None
+        return metadata
 
     def transform_raster(self,
                          input_file: str,
@@ -163,11 +196,13 @@ class Transformer():
             raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
         try:
             success = False
+            input_metadata = self.raster_metadata(input_file)
             gdal.Warp(output_file,
                       input_file,
                       dstSRS=self.crs_to,
                       srcSRS=self.crs_from,
-                      creationOptions=["COMPRESS=DEFLATE", "TILED=YES"]
+                    #   creationOptions=[f"COMPRESS={input_metadata['compression']}", "TILED=YES"]
+                      creationOptions=[f"COMPRESS={input_metadata['compression']}"]
                       )
             success = True
         finally:
