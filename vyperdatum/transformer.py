@@ -8,9 +8,11 @@ from pyproj._transformer import AreaOfInterest
 import numpy as np
 from osgeo import gdal, osr, ogr
 from tqdm import tqdm
+from utils import raster_utils
 
 
 logger = logging.getLogger("root_logger")
+gdal.UseExceptions()
 
 
 class Transformer():
@@ -25,7 +27,7 @@ class Transformer():
                  accuracy: Optional[float] = None,
                  allow_ballpark: Optional[bool] = False,
                  force_over: bool = False,
-                 only_best: Optional[bool] = True                 
+                 only_best: Optional[bool] = True
                  ) -> None:
         """
         .. Some of the parameter descriptions adopted from pyproj :class:`Transformer`
@@ -83,13 +85,16 @@ class Transformer():
 
         self.transformer_group = TransformerGroup(crs_from=self.crs_from,
                                                   crs_to=self.crs_to,
-                                                  allow_ballpark=False
+                                                  allow_ballpark=allow_ballpark
                                                   )
-        if self.transformer_group.transformers < 1:
+        if len(self.transformer_group.transformers) > 0:
+            print(f"Found {len(self.transformer_group.transformers)} transformer(s) for"
+                  f"\n\tcrs_from: {self.crs_from.name}\n\tcrs_to: {self.crs_to.name}")
+        else:
             err_msg = ("No transformers identified for the following transformation:"
-                       f"\ncrs_from:{self.crs_from.name}\ncrs_to:{self.crs_to.name}")
+                       f"\n\tcrs_from: {self.crs_from.name}\n\tcrs_to: {self.crs_to.name}")
             logger.exception(err_msg)
-            raise ValueError(err_msg)
+            raise NotImplementedError(err_msg)
 
         self.transformer = pp.Transformer.from_crs(crs_from=self.crs_from,
                                                    crs_to=self.crs_to,
@@ -128,7 +133,7 @@ class Transformer():
         return xt, yt, zt
 
     @staticmethod
-    def gdal_extensions():
+    def gdal_extensions() -> list[str]:
         """
         Return a lower-cased list of driver names supported by gdal.
 
@@ -140,25 +145,12 @@ class Transformer():
             ["." + gdal.GetDriver(i).ShortName.lower() for i in range(gdal.GetDriverCount())]
             + [".tif", ".tiff"]
             )
-    
-    @staticmethod
-    def raster_metadata(raster_file: str):
-        metadata = {}
-        ds = gdal.Open(raster_file, gdal.GA_ReadOnly)
-        metadata |= {"description": ds.GetDescription()}
-        metadata |= {"driver": ds.GetDriver().ShortName}
-        metadata |= {"bands": ds.RasterCount}
-        metadata |= {"dimensions": f"{ds.RasterXSize} x {ds.RasterYSize}"}
-        metadata |= {"band_descriptions": [ds.GetRasterBand(i+1).GetDescription() for i in range(ds.RasterCount)]}
-        metadata |= {"compression": ds.GetMetadata('IMAGE_STRUCTURE').get('COMPRESSION', None)}
-        metadata |= {"geo_transform": ds.GetGeoTransform()}
-        metadata |= {"wkt": ds.GetProjection()}
-        ds = None
-        return metadata
 
     def transform_raster(self,
                          input_file: str,
-                         output_file: str
+                         output_file: str,
+                         overview: bool = True,
+                         embed_overview: bool = True
                          ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
@@ -170,6 +162,8 @@ class Transformer():
             If `.crs_input` or `.crs_output` is not set.
         FileNotFoundError:
             If the input raster file is not found.
+        NotImplementedError:
+            If the input vector file is not supported by gdal.
 
         Parameters
         -----------
@@ -177,8 +171,12 @@ class Transformer():
             Path to the input raster file (gdal supported).
         output_file: str
             Path to the transformed raster file.
-        NotImplementedError:
-            If the input vector file is not supported by gdal.
+        overview: bool, default=True
+            If True, overview bands are added to the output raster file.
+        embed_overview: bool, default=True
+            If True, the overviews will be embedded in the file, otherwise stored externally.
+            Will be ignored if `overview = False`.
+
 
         Returns
         --------
@@ -196,7 +194,7 @@ class Transformer():
             raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
         try:
             success = False
-            input_metadata = self.raster_metadata(input_file)
+            input_metadata = raster_utils.raster_metadata(input_file)
             gdal.Warp(output_file,
                       input_file,
                       dstSRS=self.crs_to,
@@ -204,6 +202,9 @@ class Transformer():
                     #   creationOptions=[f"COMPRESS={input_metadata['compression']}", "TILED=YES"]
                       creationOptions=[f"COMPRESS={input_metadata['compression']}"]
                       )
+            if overview and input_metadata["driver"].lower() == "gtiff":
+                raster_utils.add_overview(output_file, embed_overview, input_metadata["compression"])
+                raster_utils.add_rat(output_file)
             success = True
         finally:
             return success
