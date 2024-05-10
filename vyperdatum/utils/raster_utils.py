@@ -5,13 +5,17 @@ import numpy as np
 def raster_metadata(raster_file: str) -> dict:
     metadata = {}
     ds = gdal.Open(raster_file, gdal.GA_ReadOnly)
+    srs = ds.GetSpatialRef()
     metadata |= {"description": ds.GetDescription()}
     metadata |= {"driver": ds.GetDriver().ShortName}
     metadata |= {"bands": ds.RasterCount}
     metadata |= {"dimensions": f"{ds.RasterXSize} x {ds.RasterYSize}"}
+    metadata |= {"band_no_data": [ds.GetRasterBand(i+1).GetNoDataValue()
+                                  for i in range(ds.RasterCount)]}
     metadata |= {"band_descriptions": [ds.GetRasterBand(i+1).GetDescription()
                                        for i in range(ds.RasterCount)]}
     metadata |= {"compression": ds.GetMetadata('IMAGE_STRUCTURE').get('COMPRESSION', None)}
+    metadata |= {"coordinate_epoch": srs.GetCoordinateEpoch()}
     metadata |= {"geo_transform": ds.GetGeoTransform()}
     metadata |= {"wkt": ds.GetProjection()}
     ds = None

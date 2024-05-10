@@ -106,6 +106,9 @@ class Transformer():
                                                    force_over=force_over,
                                                    only_best=only_best
                                                    )
+        if not self.transformer.has_inverse:
+            logger.warning("No inverse transformer has defined!")
+
 
     def transform_points(self,
                          x: Union[float, int, list, np.ndarray],
