@@ -24,11 +24,7 @@ def build_transformer(crs_from: str, crs_to: str):
 def main(input_file):
     iband = 1
     x, y, z = get_band_array(input_file, iband)
-
-    # metadata = raster_utils.raster_metadata(input_file)
-    # x = np.where((x == metadata["band_no_data"][iband]) | (np.isnan(x)), 0, x)
-    # y = np.where((y == metadata["band_no_data"][iband]) | (np.isnan(y)), 0, y)
-    # z = np.where((z == metadata["band_no_data"][iband]) | (np.isnan(z)), 0, z)
+    # TODO: handle no-data and nans
 
     t1 = build_transformer(crs_from="EPSG:32618", crs_to="EPSG:9755")
     x1, y1, z1 = t1.transform_points(x.flatten(), y.flatten(), z.flatten())
