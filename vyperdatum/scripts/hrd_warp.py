@@ -17,7 +17,8 @@ def warp(input_file: str,
      "warpOptions": [f"APPLY_VERTICAL_SHIFT={'YES' if apply_vertical else 'NO'}"],
      "srcSRS": crs_from,
      "dstSRS": crs_to,
-     "errorThreshold": 0
+     "errorThreshold": 0,
+     'options': ["s_coord_epoch=2010.0", "t_coord_epoch=2010.0"],
     }
     print(f"Generating: {output_file}")
     gdal.Warp(output_file, input_file, **kwargs)
