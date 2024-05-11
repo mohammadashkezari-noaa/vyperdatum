@@ -202,7 +202,6 @@ class Transformer():
                       input_file,
                       dstSRS=self.crs_to,
                       srcSRS=self.crs_from,
-                    #   creationOptions=[f"COMPRESS={input_metadata['compression']}", "TILED=YES"]
                       creationOptions=[f"COMPRESS={input_metadata['compression']}"]
                       )
             if overview and input_metadata["driver"].lower() == "gtiff":
