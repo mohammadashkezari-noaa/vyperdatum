@@ -82,7 +82,6 @@ class Transformer():
             crs_to = pp.CRS(crs_to)
         self.crs_from = crs_from
         self.crs_to = crs_to
-
         self.transformer_group = TransformerGroup(crs_from=self.crs_from,
                                                   crs_to=self.crs_to,
                                                   allow_ballpark=allow_ballpark
@@ -95,7 +94,6 @@ class Transformer():
                        f"\n\tcrs_from: {self.crs_from.name}\n\tcrs_to: {self.crs_to.name}")
             logger.exception(err_msg)
             raise NotImplementedError(err_msg)
-
         self.transformer = pp.Transformer.from_crs(crs_from=self.crs_from,
                                                    crs_to=self.crs_to,
                                                    always_xy=always_xy,
@@ -108,7 +106,6 @@ class Transformer():
                                                    )
         if not self.transformer.has_inverse:
             logger.warning("No inverse transformer has defined!")
-
 
     def transform_points(self,
                          x: Union[float, int, list, np.ndarray],
@@ -152,8 +149,11 @@ class Transformer():
     def transform_raster(self,
                          input_file: str,
                          output_file: str,
+                         apply_vertical: bool,
                          overview: bool = True,
-                         embed_overview: bool = True
+                         embed_overview: bool = True,
+                         from_epoch: Optional[float] = None,
+                         to_epoch: Optional[float] = None
                          ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
@@ -172,6 +172,10 @@ class Transformer():
         -----------
         input_file: str
             Path to the input raster file (gdal supported).
+        output_file: str
+            Path to the transformed raster file.
+        apply_vertical: bool
+            Apply GDAL vertical shift.
         output_file: str
             Path to the transformed raster file.
         overview: bool, default=True
@@ -198,15 +202,26 @@ class Transformer():
         try:
             success = False
             input_metadata = raster_utils.raster_metadata(input_file)
-            gdal.Warp(output_file,
-                      input_file,
-                      dstSRS=self.crs_to,
-                      srcSRS=self.crs_from,
-                      creationOptions=[f"COMPRESS={input_metadata['compression']}"]
-                      )
-            if overview and input_metadata["driver"].lower() == "gtiff":
-                raster_utils.add_overview(output_file, embed_overview, input_metadata["compression"])
-                raster_utils.add_rat(output_file)
+            # gdal.Warp(output_file,
+            #           input_file,
+            #           dstSRS=self.crs_to,
+            #           srcSRS=self.crs_from,
+            #           creationOptions=[f"COMPRESS={input_metadata['compression']}"]
+            #           )
+            raster_utils.warp(input_file=input_file,
+                              output_file=output_file,
+                              apply_vertical=apply_vertical,
+                              crs_from=self.crs_from,
+                              crs_to=self.crs_to,
+                              driver=input_metadata["driver"],
+                              compression=input_metadata["compression"],
+                              from_epoch=from_epoch,
+                              to_epoch=to_epoch
+                              )
+            # if overview and input_metadata["driver"].lower() == "gtiff":
+            #     # TODO: double-check the overview function
+            #     # raster_utils.add_overview(output_file, embed_overview, input_metadata["compression"])
+            #     raster_utils.add_rat(output_file)
             success = True
         finally:
             return success

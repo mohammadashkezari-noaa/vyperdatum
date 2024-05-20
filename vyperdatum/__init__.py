@@ -1,7 +1,5 @@
-import pathlib
-import json
+import os, pathlib, json, time
 import logging.config
-import time
 from osgeo import gdal
 from vyperdatum.db import DB
 
@@ -15,6 +13,8 @@ log_configuration_dict = json.load(
 logging.config.dictConfig(log_configuration_dict)
 logging.Formatter.converter = time.gmtime
 
+
+os.environ.update(PROJ_NETWORK="ON")
 
 gdal.UseExceptions()
 
