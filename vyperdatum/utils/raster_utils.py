@@ -1,32 +1,68 @@
-import os, shutil
+import os
+import shutil
+import pathlib
+import glob
+import logging
 from osgeo import gdal, osr
 import numpy as np
 from typing import Union, Optional
 import pyproj as pp
 
+logger = logging.getLogger("root_logger")
+gdal.UseExceptions()
 
-def raster_metadata(raster_file: str) -> dict:
-    metadata = {}
-    ds = gdal.Open(raster_file, gdal.GA_ReadOnly)
-    srs = ds.GetSpatialRef()
-    metadata |= {"description": ds.GetDescription()}
-    metadata |= {"driver": ds.GetDriver().ShortName}
-    metadata |= {"bands": ds.RasterCount}
-    metadata |= {"dimensions": f"{ds.RasterXSize} x {ds.RasterYSize}"}
-    metadata |= {"band_no_data": [ds.GetRasterBand(i+1).GetNoDataValue()
-                                  for i in range(ds.RasterCount)]}
-    metadata |= {"band_descriptions": [ds.GetRasterBand(i+1).GetDescription()
-                                       for i in range(ds.RasterCount)]}
-    metadata |= {"compression": ds.GetMetadata('IMAGE_STRUCTURE').get('COMPRESSION', None)}
-    metadata |= {"coordinate_epoch": srs.GetCoordinateEpoch()}
-    geot = ds.GetGeoTransform()
-    minx, maxy = geot[0], geot[3]
-    maxx = minx + geot[1] * ds.RasterXSize
-    miny = maxy + geot[5] * ds.RasterYSize
-    metadata |= {"geo_transform": geot}
-    metadata |= {"extent": [minx, miny, maxx, maxy]}
-    metadata |= {"wkt": ds.GetProjection()}
-    ds = None
+
+def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
+    try:
+        metadata = {}
+        ds = gdal.Open(raster_file, gdal.GA_ReadOnly)
+        srs = ds.GetSpatialRef()
+        gdal_metadata = ds.GetMetadata()
+        metadata |= {"description": ds.GetDescription()}
+        metadata |= {"driver": ds.GetDriver().ShortName}
+        metadata |= {"bands": ds.RasterCount}
+        metadata |= {"dimensions": f"{ds.RasterXSize} x {ds.RasterYSize}"}
+        metadata |= {"band_no_data": [ds.GetRasterBand(i+1).GetNoDataValue()
+                                      for i in range(ds.RasterCount)]}
+        metadata |= {"band_descriptions": [ds.GetRasterBand(i+1).GetDescription()
+                                           for i in range(ds.RasterCount)]}
+        metadata |= {"compression": ds.GetMetadata("IMAGE_STRUCTURE").get("COMPRESSION", None)}
+        metadata |= {"vertical_datum_wkt": gdal_metadata.get("VERTICALDATUMWKT", None)}
+        metadata |= {"coordinate_epoch": srs.GetCoordinateEpoch()}
+        geot = ds.GetGeoTransform()
+        x_min, y_max = geot[0], geot[3]
+        x_max = x_min + geot[1] * ds.RasterXSize
+        y_min = y_max + geot[5] * ds.RasterYSize
+        metadata |= {"geo_transform": geot}
+        metadata |= {"extent": [x_min, y_min, x_max, y_max]}
+        sref = ds.GetSpatialRef()
+        metadata |= {"wkt": sref.ExportToWkt()}
+        ds = None
+
+        input_crs = pp.CRS(metadata["wkt"])
+        input_horizontal_crs = pp.CRS(input_crs.sub_crs_list[0])
+        input_vertical_crs = pp.CRS(input_crs.sub_crs_list[1])
+
+        transformer = pp.Transformer.from_crs(input_horizontal_crs,
+                                              "EPSG:6318",
+                                              always_xy=True
+                                              )
+        [[lon_min, lon_max], [lat_min, lat_max]] = transformer.transform([x_min, x_max],
+                                                                        [y_min, y_max])
+        metadata |= {"geo_extent": [lon_min, lat_min, lon_max, lat_max]}
+    except Exception as e:
+        logger.exception(f"Unable to get raster metadata: {e}")
+
+    if verbose:
+        print(f"{'-'*80}\nFile: {pathlib.Path(raster_file).name}"
+              f"\n\tInput CRS: {input_crs.name}"
+              f"\n\tInput Horizontal Authority: {input_horizontal_crs.to_authority()}"
+              f"\n\tInput Vertical Authority: {input_vertical_crs.to_authority()}"
+              f"\n\tInput Vertical CRS: {input_vertical_crs}"
+              f"\n\tInput Vertical CRS WKT: {input_vertical_crs.to_wkt()}"
+              f"\n\tInput Vertical Datum WKT (Xipe): {metadata['vertical_datum_wkt']}"
+              f"\n{'-'*80}\n"
+              )
     return metadata
 
 
@@ -97,7 +133,7 @@ def crs_to_code_auth(crs: pp.CRS) -> Optional[str]:
     def get_code_auth(_crs: pp.CRS):
         if _crs.to_authority(min_confidence=100):
             return ":".join(_crs.to_authority(min_confidence=100))
-        raise ValueError(f"Unable to produce authority code and name for this crs:\n{_crs}")
+        raise ValueError(f"Unable to produce authority name and code for this crs:\n{_crs}")
 
     if crs.is_compound:
         hcrs = pp.CRS(crs.sub_crs_list[0])
@@ -187,3 +223,34 @@ def warp(input_file: str,
         if os.path.isfile(tmp_output_file):
             os.remove(tmp_output_file)
     return
+
+
+def get_region_polygons(datums_directory: str, extension: str = 'kml') -> dict:
+    """"
+    Search the datums directory to find all geometry files. All datums are assumed to reside in a subfolder.
+
+    Parameters
+    ----------
+    datums_directory : str
+        absolute folder path to the vdatum directory
+
+    extension : str
+        the geometry file extension to search for
+
+    Returns
+    -------
+    dict
+        dictionary of {kml name: kml path, ...}
+    """
+
+    search_path = os.path.join(datums_directory, f'*/*.{extension}')
+    geom_list = glob.glob(search_path)
+    if len(geom_list) == 0:
+        errmsg = f'No {extension} files found in the provided directory: {datums_directory}'
+        print(errmsg)
+    geom = {}
+    for filename in geom_list:
+        geom_path, geom_file = os.path.split(filename)
+        root_dir, geom_name = os.path.split(geom_path)
+        geom[geom_name] = filename
+    return geom
