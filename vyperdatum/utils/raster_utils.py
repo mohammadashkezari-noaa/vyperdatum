@@ -225,32 +225,3 @@ def warp(input_file: str,
     return
 
 
-def get_region_polygons(datums_directory: str, extension: str = 'kml') -> dict:
-    """"
-    Search the datums directory to find all geometry files. All datums are assumed to reside in a subfolder.
-
-    Parameters
-    ----------
-    datums_directory : str
-        absolute folder path to the vdatum directory
-
-    extension : str
-        the geometry file extension to search for
-
-    Returns
-    -------
-    dict
-        dictionary of {kml name: kml path, ...}
-    """
-
-    search_path = os.path.join(datums_directory, f'*/*.{extension}')
-    geom_list = glob.glob(search_path)
-    if len(geom_list) == 0:
-        errmsg = f'No {extension} files found in the provided directory: {datums_directory}'
-        print(errmsg)
-    geom = {}
-    for filename in geom_list:
-        geom_path, geom_file = os.path.split(filename)
-        root_dir, geom_name = os.path.split(geom_path)
-        geom[geom_name] = filename
-    return geom
