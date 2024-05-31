@@ -7,6 +7,7 @@ from osgeo import gdal, osr
 import numpy as np
 from typing import Union, Optional
 import pyproj as pp
+from .region_utils import overlapping_regions
 
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
@@ -40,8 +41,12 @@ def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
         ds = None
 
         input_crs = pp.CRS(metadata["wkt"])
-        input_horizontal_crs = pp.CRS(input_crs.sub_crs_list[0])
-        input_vertical_crs = pp.CRS(input_crs.sub_crs_list[1])
+        if input_crs.is_compound:
+            input_horizontal_crs = pp.CRS(input_crs.sub_crs_list[0])
+            input_vertical_crs = pp.CRS(input_crs.sub_crs_list[1])
+        else:
+            input_horizontal_crs = input_crs
+            input_vertical_crs = None
 
         transformer = pp.Transformer.from_crs(input_horizontal_crs,
                                               "EPSG:6318",
@@ -50,6 +55,8 @@ def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
         [[lon_min, lon_max], [lat_min, lat_max]] = transformer.transform([x_min, x_max],
                                                                         [y_min, y_max])
         metadata |= {"geo_extent": [lon_min, lat_min, lon_max, lat_max]}
+        metadata |= {"regions": overlapping_regions(r"C:\Users\mohammad.ashkezari\Desktop\vdatum_all_20230907\vdatum",
+                                                    *metadata["geo_extent"])}
     except Exception as e:
         logger.exception(f"Unable to get raster metadata: {e}")
 
@@ -57,9 +64,9 @@ def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
         print(f"{'-'*80}\nFile: {pathlib.Path(raster_file).name}"
               f"\n\tInput CRS: {input_crs.name}"
               f"\n\tInput Horizontal Authority: {input_horizontal_crs.to_authority()}"
-              f"\n\tInput Vertical Authority: {input_vertical_crs.to_authority()}"
-              f"\n\tInput Vertical CRS: {input_vertical_crs}"
-              f"\n\tInput Vertical CRS WKT: {input_vertical_crs.to_wkt()}"
+              f"\n\tInput Vertical Authority: {input_vertical_crs.to_authority() if input_crs.is_compound else None}"
+              f"\n\tInput Vertical CRS: {input_vertical_crs if input_crs.is_compound else None}"
+              f"\n\tInput Vertical CRS WKT: {input_vertical_crs.to_wkt() if input_crs.is_compound else None}"
               f"\n\tInput Vertical Datum WKT (Xipe): {metadata['vertical_datum_wkt']}"
               f"\n{'-'*80}\n"
               )
