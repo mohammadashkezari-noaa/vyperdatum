@@ -1,16 +1,8 @@
-import os, sys, pathlib
-import pyproj as pp
+import sys, pathlib
 sys.path.append("..")
 from transformer import Transformer
 from utils.raster_utils import raster_metadata
 
-
-def get_raster_crs(input_file: str, verbose: bool):
-    meta = raster_metadata(input_file, verbose=verbose)
-    input_crs = pp.CRS(meta["wkt"])
-    input_horizontal_crs = pp.CRS(input_crs.sub_crs_list[0])
-    input_vertical_crs = pp.CRS(input_crs.sub_crs_list[1])
-    return input_crs, input_horizontal_crs, input_vertical_crs
 
 
 
@@ -24,6 +16,7 @@ def transform(input_file):
                      crs_to="EPSG:4759+NOAA:5498",
                      allow_ballpark=False
                      )
+    print(f"t1: {t1.transformer.to_proj4()}\n{'-'*40}")
     out_file1 = pathlib.Path(input_file).with_stem("_01_4759_5498_" + pathlib.Path(input_file).stem)
     t1.transform_raster(input_file=input_file,
                         output_file=out_file1,
@@ -35,6 +28,7 @@ def transform(input_file):
                      crs_to="EPSG:4759+EPSG:5703",
                      allow_ballpark=False
                      )
+    print(f"t2: {t2.transformer.to_proj4()}\n{'-'*40}")
     out_file2 = pathlib.Path(input_file).with_stem("_02_4759_5703_" + pathlib.Path(input_file).stem)
     t2.transform_raster(input_file=out_file1,
                         output_file=out_file2,
@@ -46,6 +40,7 @@ def transform(input_file):
                      crs_to="EPSG:26914+EPSG:5703",
                      allow_ballpark=False
                      )
+    print(f"t3: {t3.transformer.to_proj4()}\n{'-'*40}")
     out_file3 = pathlib.Path(input_file).with_stem("_03_6318_5703_" + pathlib.Path(input_file).stem)
     t3.transform_raster(input_file=out_file2,
                         output_file=out_file3,
@@ -54,38 +49,39 @@ def transform(input_file):
     return
 
 
-
-
 if __name__ == "__main__":
-
-
-    #### WKT and CRS looks Good! but it's transferred to MSL instead of NAVD88 (NAD83 / UTM zone 19N + MLLW height  >>>>>  NAD83(2011) / UTM zone 19N + MSL height)
-    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BC26J26D\Modeling_BC26J26D_20230313.tiff"
-    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BC26J26D\BlueTopo_BC26J26D_20230313.tiff"
-
-
-    #### WKT and CRS looks Good! but it's transferred to MSL instead of NAVD88 (NAD83 / UTM zone 19N + MLLW height  >>>>>  NAD83(2011) / UTM zone 19N + MSL height)
-    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BH5594ZK\BlueTopo_BH5594ZK_20240304.tiff"
-    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BH5594ZK\Modeling_BH5594ZK_20240304.tiff"
-
-    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BC25L26L\BlueTopo_BC25L26L_20230919.tiff"
     input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BC25L26L\Modeling_BC25L26L_20230919.tiff"
+    print(raster_metadata(input_file, verbose=True))
+    transform(input_file)
 
 
-    #### WKT and CRS looks Good! but it's transferred to MSL instead of NAVD88 (NAD83 / UTM zone 19N + MLLW height  >>>>>  NAD83(2011) / UTM zone 19N + MSL height)
-    # ## HRD
-    # input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\HRD\Tile1_PBC18_4m_20211001_145447.tif"
+"""
+The existing vyperdatum does this transformation a bit differently:
+First, it recognizes that the raster file covers two regions and then perform the following transformations:
 
-    # ## MSP
-    # input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\MSP\Tile24_PBG16n_4m_Navigation_20231025_112416_0m_20231027_154223.tif"
-
-    # ## MAINE-CAN
-    # input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\Maine_Canada\Modeling_BH54Q5HQ_20240510.tiff"
-
-    # ## Caribbean
-    # input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\Caribbean\Modeling_BH4WT4ZK_20240307.tiff"
-
-    get_raster_crs(input_file, verbose=True)
-    # transform(input_file)
++proj=pipeline +step +inv +proj=vgridshift grids=TXlagmat01_8301\mllw.gtx +step +proj=vgridshift grids=TXlagmat01_8301\tss.gtx
+----------------------------------------
++proj=pipeline +step +inv +proj=vgridshift grids=TXshlmat01_8301\mllw.gtx +step +proj=vgridshift grids=TXshlmat01_8301\tss.gtx
+----------------------------------------
 
 
+
+
+In the new system, the two Texas regions are defined by one 'extent' called: 'TXcoast01' (extent id: 17106)
+The followings are the 3-step transformations:
+
+t1: +proj=pipeline +step +inv +proj=utm +zone=14 +ellps=GRS80 +step +proj=gridshift +grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif +step +proj=gridshift +no_z_transform +grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif +step +proj=gridshift +no_z_transform +grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif +step +proj=unitconvert +xy_in=rad +xy_out=deg +step +proj=axisswap +order=2,1
+
+t2: +proj=pipeline +step +proj=axisswap +order=2,1 +step +proj=unitconvert +xy_in=deg +xy_out=rad +step +inv +proj=vgridshift +grids=us_noaa_nos_NAD83(NSRS2007)_MLLW_LMSL_(Txcoast01_vdatum_2.3.4_20120629_1983-2001).tif +multiplier=1 +step +inv +proj=vgridshift +grids=us_noaa_nos_NAD83(NSRS2007)_LMSL_NAVD88_(Txcoast01_vdatum_2.3.4_20120629_1983-2001).tif +multiplier=1 +step +proj=unitconvert +xy_in=rad +xy_out=deg +step +proj=axisswap +order=2,1
+
+t3: +proj=pipeline +step +proj=axisswap +order=2,1 +step +proj=unitconvert +xy_in=deg +xy_out=rad +step +inv +proj=gridshift +no_z_transform +grids=us_noaa_nadcon5_nad83_fbn_nad83_2007_conus.tif +step +inv +proj=gridshift +no_z_transform +grids=us_noaa_nadcon5_nad83_harn_nad83_fbn_conus.tif +step +inv +proj=gridshift +grids=us_noaa_nadcon5_nad83_1986_nad83_harn_conus.tif +step +proj=utm +zone=14 +ellps=GRS80
+
+
+
+
+Potential Sources of Discrepancies Between the Past and New Transformations:
+- Horizontal transformations to/from NAD83(NSRS2007)
+- Broadly, different proj pipelines (involving different grid files)
+- Potential unidentified gdal.Warp issues (such as incorrect options etc ...)
+- Ongoing PROJ 'unable to compute output bounds' errors.
+"""
