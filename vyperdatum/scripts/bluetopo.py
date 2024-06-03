@@ -82,6 +82,6 @@ t3: +proj=pipeline +step +proj=axisswap +order=2,1 +step +proj=unitconvert +xy_i
 Potential Sources of Discrepancies Between the Past and New Transformations:
 - Horizontal transformations to/from NAD83(NSRS2007)
 - Broadly, different proj pipelines (involving different grid files)
-- Potential unidentified gdal.Warp issues (such as incorrect options etc ...)
+- Potential unidentified gdal.Warp issues (such as missing/incorrect options etc ...)
 - Ongoing PROJ 'unable to compute output bounds' errors.
 """

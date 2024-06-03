@@ -179,7 +179,7 @@ def warp(input_file: str,
     try:
         tmp_output_file = shutil.copy2(input_file, str(output_file)+".tmp")
         translate_kwargs = {"format": driver,
-                            "creationOptions": [f"COMPRESS={compression}",
+                            "creationOptions": [f"COMPRESS=DEFLATE",
                                                 "BIGTIFF=IF_NEEDED",
                                                 "TILED=YES"
                                                 ]
