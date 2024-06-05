@@ -87,7 +87,7 @@ class DB:
         finally:
             return success
 
-    def connect(self) -> Tuple[Optional[object], Optional[object]]:
+    def _connect(self) -> Tuple[Optional[object], Optional[object]]:
         """
         Connect to the proj database.
 
@@ -128,7 +128,7 @@ class DB:
         """
         try:
             con, cur, res = None, None, None
-            con, cur = self.connect()
+            con, cur = self._connect()
             cur.execute(sql)
             res = cur.fetchall()
             logger.info(res)

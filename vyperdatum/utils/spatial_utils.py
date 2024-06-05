@@ -1,7 +1,10 @@
 import os
 import glob
 import logging
+from typing import Optional, Union
+import pandas as pd
 from osgeo import gdal, ogr
+from db import DB
 
 
 logger = logging.getLogger("root_logger")
@@ -150,3 +153,71 @@ def overlapping_regions(datums_directory: str,
         #         intersecting_regions.append(region)
         vector = None
     return intersecting_regions
+
+
+def overlapping_extents(lon_min: float,
+                        lat_min: float,
+                        lon_max: float,
+                        lat_max: float
+                        ) -> Union[Optional[list], Optional[pd.DataFrame]]:
+    """
+    Return database predefined extents that intersect with an area of interest.
+    The results are sorted by coverage ratios.
+
+    Parameters
+    ----------
+    lon_min
+        the minimum longitude of the area of interest
+    lat_min
+        the minimum latitude of the area of interest
+    lon_max
+        the maximum longitude of the area of interest
+    lat_max
+        the maximum latitude of the area of interest
+    """
+
+    sql = f"""
+    with data_extent AS (
+        SELECT {lon_min} as min_lon,
+               {lon_max} as max_lon,
+               {lat_min} as min_lat,
+               {lat_max} as max_lat
+        )
+    select *,
+
+    -- ratio of data covered by a database extent:
+    -- intersecting area of data and database extent divided by data area
+    (
+    (
+    (min(data_extent.max_lon, east_lon) - max(data_extent.min_lon, west_lon))
+    *
+    (min(data_extent.max_lat, north_lat) - max(data_extent.min_lat, south_lat))
+    ) / ((data_extent.max_lon-data_extent.min_lon) * (data_extent.max_lat-data_extent.min_lat)) 
+    )
+    as data_coverage_ratio,
+
+
+    -- ratio of a database extent covered by data:
+    -- intersecting area of data and database extent divided by the database extent area
+    (
+    (
+    (min(data_extent.max_lon, east_lon) - max(data_extent.min_lon, west_lon))
+    *
+    (min(data_extent.max_lat, north_lat) - max(data_extent.min_lat, south_lat))
+    ) / ((east_lon-west_lon) * (north_lat-south_lat)) 
+    )
+    as extent_coverage_ratio
+
+    from extent, data_extent
+    where
+    east_lon >= data_extent.min_lon
+    and west_lon <= data_extent.max_lon
+    and north_lat >= data_extent.min_lat
+    and south_lat <= data_extent.max_lat
+    and deprecated = 0
+    order by data_coverage_ratio desc,
+             extent_coverage_ratio desc,
+             (abs(east_lon - west_lon) * abs(north_lat - south_lat))
+    """
+
+    return DB().query(sql, dataframe=True)

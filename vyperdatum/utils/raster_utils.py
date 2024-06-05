@@ -1,13 +1,14 @@
 import os
 import shutil
 import pathlib
-import glob
 import logging
 from osgeo import gdal, osr
 import numpy as np
 from typing import Union, Optional
 import pyproj as pp
-from .region_utils import overlapping_regions
+from .spatial_utils import overlapping_regions, overlapping_extents
+
+
 
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
@@ -55,8 +56,10 @@ def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
         [[lon_min, lon_max], [lat_min, lat_max]] = transformer.transform([x_min, x_max],
                                                                         [y_min, y_max])
         metadata |= {"geo_extent": [lon_min, lat_min, lon_max, lat_max]}
-        metadata |= {"regions": overlapping_regions(r"C:\Users\mohammad.ashkezari\Desktop\vdatum_all_20230907\vdatum",
+        metadata |= {"overlapping_regions": overlapping_regions(r"C:\Users\mohammad.ashkezari\Desktop\vdatum_all_20230907\vdatum",
                                                     *metadata["geo_extent"])}
+        metadata |= {"overlapping_extents": overlapping_extents(*metadata["geo_extent"])}
+                                                    
     except Exception as e:
         logger.exception(f"Unable to get raster metadata: {e}")
 
