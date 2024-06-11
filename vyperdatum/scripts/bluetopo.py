@@ -2,7 +2,7 @@ import sys, pathlib
 sys.path.append("..")
 from transformer import Transformer
 from utils.raster_utils import raster_metadata
-
+from osgeo import gdal
 
 
 
@@ -10,6 +10,19 @@ def transform(input_file):
     """
     Transform from NAD83 / UTM zone 14N + MLLW to NAD83(2011) / UTM zone 19N + NAVD88
     """
+
+    warp_kwargs_vertical = {
+                            "outputType": gdal.gdalconst.GDT_Float32,
+                            "srcBands": [1],
+                            "dstBands": [1],
+                            "warpOptions": ["APPLY_VERTICAL_SHIFT=YES"],
+                            "errorThreshold": 0,
+                            }
+    warp_kwargs = {
+                   "outputType": gdal.gdalconst.GDT_Float32,
+                   "warpOptions": ["APPLY_VERTICAL_SHIFT=NO"],
+                   "errorThreshold": 0,
+                   }
 
     # Horizontal: NAD83 / UTM zone 14N + MLLW  height >>>>  NAD83(NSRS2007) + MLLW height
     t1 = Transformer(crs_from="EPSG:26914+NOAA:5498",
@@ -20,7 +33,7 @@ def transform(input_file):
     out_file1 = pathlib.Path(input_file).with_stem("_01_4759_5498_" + pathlib.Path(input_file).stem)
     t1.transform_raster(input_file=input_file,
                         output_file=out_file1,
-                        apply_vertical=False
+                        apply_vertical=False,
                         )
 
     # Vertical: NAD83(NSRS2007) + MLLW height >>>>  NAD83(NSRS2007) + NAVD88
@@ -32,7 +45,8 @@ def transform(input_file):
     out_file2 = pathlib.Path(input_file).with_stem("_02_4759_5703_" + pathlib.Path(input_file).stem)
     t2.transform_raster(input_file=out_file1,
                         output_file=out_file2,
-                        apply_vertical=True
+                        apply_vertical=True,
+                        warp_kwargs=warp_kwargs_vertical
                         )
 
     # Project: NAD83(NSRS2007) + NAVD88  >>>>  NAD83 / UTM 14N + NAVD88
@@ -46,14 +60,17 @@ def transform(input_file):
                         output_file=out_file3,
                         apply_vertical=False
                         )
-    return
+    return out_file3
 
 
 if __name__ == "__main__":
     input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BC25L26L\Modeling_BC25L26L_20230919.tiff"
-    print(raster_metadata(input_file, verbose=True))
-    transform(input_file)
-
+    input_meta = raster_metadata(input_file, verbose=True)
+    print(input_meta)
+    # transformed_file = transform(input_file)
+    # transformed_meta = raster_metadata(transformed_file, verbose=True)
+    # print(f"Input Stats: {input_meta['band_stats']}")
+    # print(f"Transformed Stats: {transformed_meta['band_stats']}")
 
 """
 The existing vyperdatum does this transformation a bit differently:

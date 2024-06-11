@@ -1,6 +1,7 @@
 import os
 import pathlib
 import logging
+import shutil
 from typing import Union, Optional
 import pyproj as pp
 from pyproj.transformer import TransformerGroup
@@ -152,8 +153,7 @@ class Transformer():
                          apply_vertical: bool,
                          overview: bool = True,
                          embed_overview: bool = True,
-                         from_epoch: Optional[float] = None,
-                         to_epoch: Optional[float] = None
+                         warp_kwargs: Optional[dict] = None,
                          ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
@@ -202,22 +202,36 @@ class Transformer():
         try:
             success = False
             input_metadata = raster_utils.raster_metadata(input_file)
+
+            # # legacy raster warp1
             # gdal.Warp(output_file,
             #           input_file,
             #           dstSRS=self.crs_to,
             #           srcSRS=self.crs_from,
             #           creationOptions=[f"COMPRESS={input_metadata['compression']}"]
             #           )
-            raster_utils.warp(input_file=input_file,
-                              output_file=output_file,
-                              apply_vertical=apply_vertical,
-                              crs_from=self.crs_from,
-                              crs_to=self.crs_to,
-                              driver=input_metadata["driver"],
-                              compression=input_metadata["compression"],
-                              from_epoch=from_epoch,
-                              to_epoch=to_epoch
-                              )
+
+            # # legacy raster warp2
+            # raster_utils.warp(input_file=input_file,
+            #                   output_file=output_file,
+            #                   apply_vertical=apply_vertical,
+            #                   crs_from=self.crs_from,
+            #                   crs_to=self.crs_to,
+            #                   driver=input_metadata["driver"],
+            #                   compression=input_metadata["compression"],
+            #                 #   from_epoch=from_epoch,
+            #                 #   to_epoch=to_epoch
+            #                   )
+
+            raster_utils.gdal_warp(input_file=input_file,
+                                   output_file=output_file,
+                                   apply_vertical=apply_vertical,
+                                   crs_from=self.crs_from,
+                                   crs_to=self.crs_to,
+                                   input_metadata=input_metadata,
+                                   warp_kwargs=warp_kwargs
+                                   )
+
             # if overview and input_metadata["driver"].lower() == "gtiff":
             #     # TODO: double-check the overview function
             #     # raster_utils.add_overview(output_file, embed_overview, input_metadata["compression"])
@@ -257,9 +271,9 @@ class Transformer():
         """
         try:
             if not (isinstance(self.crs_from, pp.CRS) & isinstance(self.crs_to, pp.CRS)):
-                raise ValueError(("The `.crs_input` and `.crs_output` attributes"
-                                "must be set with `pyproj.CRS` type values.")
-                                )
+                raise ValueError("The `.crs_input` and `.crs_output` attributes"
+                                 "must be set with `pyproj.CRS` type values."
+                                 )
             if not os.path.isfile(input_file):
                 raise FileNotFoundError(f"The input vector file not found at {input_file}.")
 
