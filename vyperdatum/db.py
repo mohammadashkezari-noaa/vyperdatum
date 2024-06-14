@@ -131,7 +131,7 @@ class DB:
             con, cur = self._connect()
             cur.execute(sql)
             res = cur.fetchall()
-            logger.info(res)
+            # logger.info(res)
             if dataframe:
                 res = pd.DataFrame.from_records(res,
                                                 columns=[column[0] for column in cur.description]

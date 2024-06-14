@@ -202,35 +202,19 @@ class Transformer():
         try:
             success = False
             input_metadata = raster_utils.raster_metadata(input_file)
+            raster_utils.warp(input_file=input_file,
+                              output_file=output_file,
+                              apply_vertical=apply_vertical,
+                              crs_from=self.crs_from,
+                              crs_to=self.crs_to,
+                              input_metadata=input_metadata,
+                              warp_kwargs=warp_kwargs
+                              )
 
-            # # legacy raster warp1
-            # gdal.Warp(output_file,
-            #           input_file,
-            #           dstSRS=self.crs_to,
-            #           srcSRS=self.crs_from,
-            #           creationOptions=[f"COMPRESS={input_metadata['compression']}"]
-            #           )
-
-            # # legacy raster warp2
-            # raster_utils.warp(input_file=input_file,
-            #                   output_file=output_file,
-            #                   apply_vertical=apply_vertical,
-            #                   crs_from=self.crs_from,
-            #                   crs_to=self.crs_to,
-            #                   driver=input_metadata["driver"],
-            #                   compression=input_metadata["compression"],
-            #                 #   from_epoch=from_epoch,
-            #                 #   to_epoch=to_epoch
-            #                   )
-
-            raster_utils.gdal_warp(input_file=input_file,
-                                   output_file=output_file,
-                                   apply_vertical=apply_vertical,
-                                   crs_from=self.crs_from,
-                                   crs_to=self.crs_to,
-                                   input_metadata=input_metadata,
-                                   warp_kwargs=warp_kwargs
-                                   )
+            raster_utils.post_transformation_checks(source_file=input_file,
+                                                    target_file=output_file,
+                                                    target_crs=self.crs_to,
+                                                    )
 
             # if overview and input_metadata["driver"].lower() == "gtiff":
             #     # TODO: double-check the overview function

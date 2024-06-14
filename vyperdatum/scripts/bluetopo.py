@@ -67,7 +67,7 @@ if __name__ == "__main__":
     input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BC25L26L\Modeling_BC25L26L_20230919.tiff"
     input_meta = raster_metadata(input_file, verbose=True)
     print(input_meta)
-    # transformed_file = transform(input_file)
+    transformed_file = transform(input_file)
     # transformed_meta = raster_metadata(transformed_file, verbose=True)
     # print(f"Input Stats: {input_meta['band_stats']}")
     # print(f"Transformed Stats: {transformed_meta['band_stats']}")

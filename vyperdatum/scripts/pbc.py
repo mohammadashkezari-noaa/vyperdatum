@@ -53,8 +53,27 @@ def transform(input_file):
     return out_file3
 
 
+def transform2(input_file):
+
+
+    t1 = Transformer(crs_from="EPSG:6348",
+                     crs_to="EPSG:26919",
+                     allow_ballpark=False
+                     )
+    out_file1 = pathlib.Path(input_file).with_stem("_01_" + pathlib.Path(input_file).stem)
+    t1.transform_raster(input_file=input_file,
+                        output_file=out_file1,
+                        apply_vertical=False,
+                        )
+    return out_file1
+
+
+
 if __name__ == "__main__":
     input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\MA2204-TB-N_TPU_3band_mosaic_tpu.tif"
+    
+    # transform2(input_file)
+
     compressed_input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\compressed_MA2204-TB-N_TPU_3band_mosaic_tpu.tif"
     input_meta = raster_metadata(input_file, verbose=True)
     raster_compress(input_file, compressed_input_file,

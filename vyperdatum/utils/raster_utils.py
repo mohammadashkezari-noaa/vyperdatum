@@ -1,5 +1,4 @@
 import os
-import shutil
 import pathlib
 import logging
 from osgeo import gdal, osr
@@ -52,11 +51,13 @@ def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
         metadata |= {"vertical_datum_wkt": gdal_metadata.get("VERTICALDATUMWKT", None)}
         metadata |= {"coordinate_epoch": srs.GetCoordinateEpoch()}
         geot = ds.GetGeoTransform()
+        res_x, res_y = geot[1], geot[5]
         x_min, y_max = geot[0], geot[3]
-        x_max = x_min + geot[1] * ds.RasterXSize
-        y_min = y_max + geot[5] * ds.RasterYSize
+        x_max = x_min + res_x * ds.RasterXSize
+        y_min = y_max + res_y * ds.RasterYSize
         metadata |= {"geo_transform": geot}
         metadata |= {"extent": [x_min, y_min, x_max, y_max]}
+        metadata |= {"resolution": [res_x, res_y]}
         metadata |= {"wkt": srs.ExportToWkt()}
         ds = None
 
@@ -207,90 +208,9 @@ def warp(input_file: str,
          apply_vertical: bool,
          crs_from: Union[pp.CRS, str],
          crs_to: Union[pp.CRS, str],
-         driver: str,
-         compression: str,
-         from_epoch: Optional[float] = None,
-         to_epoch:  Optional[float] = None
-         ) -> None:
-    """
-    Transform an NBS raster (GTiff) file with 3 bands: Elevation, Uncertainty, and Contributors.
-
-    TODO: unfinished implementation/doc
-    """
-    if isinstance(crs_from, pp.CRS):
-        crs_from = crs_to_code_auth(crs_from)
-    if isinstance(crs_to, pp.CRS):
-        crs_to = crs_to_code_auth(crs_to)
-    options = []
-    if from_epoch is not None:
-        options += [f"s_coord_epoch={from_epoch}"]
-    if to_epoch is not None:
-        options += [f"t_coord_epoch={to_epoch}"]
-    print(f"Generating: {output_file}")
-    try:
-        tmp_output_file = shutil.copy2(input_file, str(output_file)+".tmp")
-        translate_kwargs = {"format": driver,
-                            "creationOptions": [f"COMPRESS={compression}",
-                                                "BIGTIFF=IF_NEEDED",
-                                                "TILED=YES"
-                                                ]
-                            }
-        if apply_vertical:
-            kwargs = {
-                "srcBands": [1],
-                "dstBands": [1],
-                "warpOptions": ["APPLY_VERTICAL_SHIFT=YES"],
-                "srcSRS": crs_from,
-                "dstSRS": crs_to,
-                "errorThreshold": 0,
-                }
-            ds_out = gdal.Open(tmp_output_file, gdal.GA_Update)
-            gdal.Warp(ds_out, input_file, **kwargs)
-            del ds_out
-            ds = gdal.Translate(output_file, tmp_output_file, **translate_kwargs)
-            sref = osr.SpatialReference()
-            sref.SetFromUserInput(crs_to)
-            ds.SetSpatialRef(sref)
-            del ds
-        else:
-            hcrs_from, hcrs_to = [crs.split("+")[0] for crs in (crs_from, crs_to)]
-            vcrs_from, vcrs_to = [(crs.split("+")[-1] if "+" in crs else None) for crs in (crs_from, crs_to)]
-            if vcrs_from is not None and vcrs_to is not None:
-                assert vcrs_from == vcrs_to
-                crs_out = crs_to
-            elif vcrs_from is None and vcrs_to is None:
-                crs_out = crs_to
-            else:
-                crs_out = f"{hcrs_to}+{vcrs_from}" if vcrs_from else f"{hcrs_to}+{vcrs_to}"
-
-            kwargs = {
-                "format": "vrt",
-                "outputType": gdal.gdalconst.GDT_Float32,
-                "srcSRS": hcrs_from,
-                "dstSRS": hcrs_to,
-                "options": options,
-                "warpOptions": ["APPLY_VERTICAL_SHIFT=NO"],
-                }
-            gdal.Warp(tmp_output_file, input_file, **kwargs)
-            ds = gdal.Translate(output_file, tmp_output_file, **translate_kwargs)
-            sref = osr.SpatialReference()
-            sref.SetFromUserInput(crs_out)
-            ds.SetSpatialRef(sref)
-            del ds
-    finally:
-        if os.path.isfile(tmp_output_file):
-            os.remove(tmp_output_file)
-    return
-
-
-def gdal_warp(input_file: str,
-              output_file: str,
-              apply_vertical: bool,
-              crs_from: Union[pp.CRS, str],
-              crs_to: Union[pp.CRS, str],
-              input_metadata: dict,
-              warp_kwargs: Optional[dict] = None
-              ):
+         input_metadata: dict,
+         warp_kwargs: Optional[dict] = None
+         ):
     """
     A gdal-warp wrapper to transform an NBS raster (GTiff) file with 3 bands:
     Elevation, Uncertainty, and Contributors.
@@ -321,19 +241,16 @@ def gdal_warp(input_file: str,
         crs_from = crs_to_code_auth(crs_from)
     if isinstance(crs_to, pp.CRS):
         crs_to = crs_to_code_auth(crs_to)
-    if warp_kwargs:
-        gdal.Warp(output_file,
-                  input_file,
-                  dstSRS=crs_to,
-                  srcSRS=crs_from,
-                  **warp_kwargs
-                  )
-    else:
-        gdal.Warp(output_file,
-                  input_file,
-                  dstSRS=crs_to,
-                  srcSRS=crs_from
-                  )
+
+    gdal.Warp(output_file,
+              input_file,
+              dstSRS=crs_to,
+              srcSRS=crs_from,
+              # xRes=input_metadata["resolution"][0],
+              # yRes=abs(input_metadata["resolution"][1]),
+              # outputBounds=input_metadata["extent"],
+              **(warp_kwargs or {})
+              )
 
     if apply_vertical:
         # horizontal CRS MUST be identical for both source and target
@@ -341,7 +258,7 @@ def gdal_warp(input_file: str,
             ds_in = gdal.Open(input_file, gdal.GA_ReadOnly)
             ds_out = gdal.Open(output_file, gdal.GA_ReadOnly)
             # combine the vertically transformed bands and
-            # the non-transformed ones into a new file raster
+            # the non-transformed ones into a new raster
             driver = gdal.GetDriverByName(input_metadata["driver"])
             mem_path = f"/vsimem/{os.path.splitext(os.path.basename(output_file))[0]}.tiff"
             ds_temp = driver.Create(mem_path,
@@ -380,3 +297,54 @@ def gdal_warp(input_file: str,
                         )
         os.remove(output_file_copy)
     return output_file
+
+
+def post_transformation_checks(source_file: str,
+                               target_file: str,
+                               target_crs: Union[pp.CRS, str],
+                               ):
+    """
+    Run a number of sanity checks on the transformed raster file.
+    Warns if a check fails.
+
+    Parameters
+    ----------
+    source_file: str
+        Absolute path to the input raster file.
+    target_file: str
+        Absolute path to the target raster file.
+    target_crs:  pyproj.crs.CRS or input used to create one
+        The expected CRS object for the target raster file.
+
+    Returns
+    ----------
+    bool
+        Returns True if all checks pass, otherwise False.
+    """
+    if ~isinstance(target_crs, pp.CRS):
+        target_crs = pp.CRS(target_crs)
+    source_meta = raster_metadata(source_file)
+    target_meta = raster_metadata(target_file)
+    passed = True
+    target_auth = target_crs.to_authority()
+    transformed_auth = pp.CRS(target_meta["wkt"]).to_authority()
+    if target_auth != transformed_auth:
+        passed = False
+        logger.warning(">>>>> Warning <<<<< The expected authority code/name of the "
+                       f"transformed raster is {target_auth}, but received {transformed_auth}"
+                       )
+    if source_meta["bands"] != target_meta["bands"]:
+        passed = False
+        logger.warning(">>>>> Warning <<<<< Number of bands in the source file "
+                       f"({source_meta['bands']}) doesn't match target ({target_meta['bands']}).")
+    if source_meta["dimensions"] != target_meta["dimensions"]:
+        passed = False
+        logger.warning(">>>>> Warning <<<<< The source file band dimensions "
+                       f" ({source_meta['dimensions']}) don't match those of the "
+                       f"transformed file ({target_meta['dimensions']}).")
+    if source_meta["resolution"][0] != target_meta["resolution"][0] or source_meta["resolution"][1] != target_meta["resolution"][1]:
+        passed = False
+        logger.warning(">>>>> Warning <<<<< The source file pixel size "
+                       f" ({source_meta['resolution']}) don't match those of the "
+                       f"transformed file ({target_meta['resolution']}).")
+    return passed
