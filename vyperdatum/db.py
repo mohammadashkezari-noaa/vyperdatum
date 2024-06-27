@@ -3,9 +3,9 @@ import sqlite3
 import logging
 from typing import Optional, Tuple, Union
 import pyproj as pp
-from enums import PROJDB as enuPDB
 from pathlib import Path
 import pandas as pd
+from vyperdatum.enums import PROJDB as enuPDB
 
 
 logger = logging.getLogger("root_logger")

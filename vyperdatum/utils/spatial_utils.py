@@ -4,7 +4,7 @@ import logging
 from typing import Optional, Union
 import pandas as pd
 from osgeo import gdal, ogr
-from db import DB
+from vyperdatum.db import DB
 
 
 logger = logging.getLogger("root_logger")

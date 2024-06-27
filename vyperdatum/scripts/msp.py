@@ -1,8 +1,7 @@
-import sys, pathlib
+import pathlib
 import pyproj as pp
-sys.path.append("..")
-from transformer import Transformer
-from utils.raster_utils import raster_metadata
+from vyperdatum.transformer import Transformer
+from vyperdatum.utils.raster_utils import raster_metadata
 
 
 def get_raster_crs(input_file: str, verbose: bool):

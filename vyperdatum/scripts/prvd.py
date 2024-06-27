@@ -1,8 +1,8 @@
-import os, sys, pathlib
+import os
+import pathlib
 import pyproj as pp
-sys.path.append("..")
-from transformer import Transformer
-from utils.raster_utils import raster_metadata
+from vyperdatum.transformer import Transformer
+from vyperdatum.utils.raster_utils import raster_metadata
 
 
 def get_raster_crs(input_file: str, verbose: bool):
@@ -75,8 +75,6 @@ def transform_19n(input_file):
     return
 
 
-
-
 if __name__ == "__main__":
     input_files = get_tiff_files(r"W:\working_space\test_environments\sandbox\PBG19") + get_tiff_files(r"W:\working_space\test_environments\sandbox\PBG20")
 
@@ -84,5 +82,3 @@ if __name__ == "__main__":
         print(input_file)
         get_raster_crs(input_file, verbose=True)
         transform_19n(input_file)
-
-

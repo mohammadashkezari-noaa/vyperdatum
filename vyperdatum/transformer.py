@@ -1,7 +1,6 @@
 import os
 import pathlib
 import logging
-import shutil
 from typing import Union, Optional
 import pyproj as pp
 from pyproj.transformer import TransformerGroup
@@ -9,7 +8,7 @@ from pyproj._transformer import AreaOfInterest
 import numpy as np
 from osgeo import gdal, osr, ogr
 from tqdm import tqdm
-from utils import raster_utils
+from vyperdatum.utils import raster_utils
 
 
 logger = logging.getLogger("root_logger")
@@ -215,6 +214,9 @@ class Transformer():
                                                     target_file=output_file,
                                                     target_crs=self.crs_to,
                                                     )
+
+
+            # raster_utils.set_nodatavalue(output_file, np.nan)
 
             # if overview and input_metadata["driver"].lower() == "gtiff":
             #     # TODO: double-check the overview function

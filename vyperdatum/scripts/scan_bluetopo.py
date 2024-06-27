@@ -1,10 +1,8 @@
-import os, sys, pathlib
+import os
 import pyproj as pp
-sys.path.append("..")
-from transformer import Transformer
-from utils.raster_utils import raster_metadata
 import pandas as pd
 from collections import Counter
+from vyperdatum.utils.raster_utils import raster_metadata
 
 
 def scan_blue(parent_dir: str, scan_file):

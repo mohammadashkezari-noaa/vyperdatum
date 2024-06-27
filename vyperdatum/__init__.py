@@ -1,8 +1,12 @@
-import os, pathlib, json, time
+from importlib.metadata import version
+import os
+import pathlib
+import json
+import time
 import logging.config
 from osgeo import gdal
-from vyperdatum.db import DB
 
+__version__ = version("vyperdatum")
 log_configuration_dict = json.load(
     open(
         pathlib.Path(
@@ -13,9 +17,7 @@ log_configuration_dict = json.load(
 logging.config.dictConfig(log_configuration_dict)
 logging.Formatter.converter = time.gmtime
 
-
 os.environ.update(PROJ_NETWORK="ON")
-
 gdal.UseExceptions()
 
 

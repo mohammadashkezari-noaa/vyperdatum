@@ -1,8 +1,7 @@
-import sys, pathlib
-sys.path.append("..")
-from transformer import Transformer
-from utils.raster_utils import raster_metadata
+import pathlib
 from osgeo import gdal
+from vyperdatum.transformer import Transformer
+from vyperdatum.utils.raster_utils import raster_metadata
 
 
 

@@ -4,6 +4,7 @@ untrack
 **/.venv
 **/venv
 Dockerfile
+vyperdatum.egg-info
 
 # Byte-compiled / optimized / DLL files
 **/__pycache__/

@@ -147,6 +147,36 @@ def add_rat(raster: str) -> None:
     return
 
 
+def set_nodatavalue(raster_file: str,
+                    band_nodatavalue: Union[list[tuple[int, float]], float],
+                    ) -> None:
+    """
+    Change the NoDataValue of the raster file bands.
+
+    parameters
+    ----------
+    raster_file: str
+        Absolute full path to the raster file.
+    band_nodatavalue: Union[list[tuple[int, float]], float]
+        A list of tuples: (band_index, NoDataValue).
+        If a single float is passed, all bands will be affected.
+    """
+    if isinstance(band_nodatavalue, float):
+        ds = gdal.Open(raster_file)
+        band_nodatavalue = [(b, band_nodatavalue) for b in range(1, ds.RasterCount+1)]
+        ds = None
+    ds = gdal.Open(raster_file, gdal.GA_Update)
+    for b, nodv in band_nodatavalue:
+        band = ds.GetRasterBand(b)
+        bar = band.ReadAsArray()
+        bar[np.where(bar == band.GetNoDataValue())] = nodv
+        band.WriteArray(bar)
+        ds.GetRasterBand(b).SetNoDataValue(nodv)
+        band = None
+    ds = None
+    return
+
+
 def raster_compress(raster_file_path: str,
                     output_file_path: str,
                     format: str,

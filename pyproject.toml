@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "vyperdatum"
+version = "0.1.1"
+authors = [
+    {name = "Mohammad Ashkezari", email = "mohammad.ashkezari@noaa.gov"},
+]
+description = "Placeholder"
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["bathymetry", "datum", "NOAA", "NBS"]
+dependencies = [
+    "numpy",
+    "gdal==3.8.4",
+    "pyproj",
+    "pandas",
+    "tqdm",
+    "pydantic"
+]
+classifiers = [
+  "Development Status :: Active",
+  "Programming Language :: Python"
+]
+
+
+[tool.setuptools]
+py-modules = ["vyperdatum"]
+
+
+[project.urls]
+Documentation = "https://readthedocs.org"
+Repository = "https://github.com/mohammadashkezari-noaa/vyperdatum"
+
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules -W error::UserWarning"
+testpaths = ["tests"]
