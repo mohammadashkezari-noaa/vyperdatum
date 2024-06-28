@@ -97,7 +97,7 @@ def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
     return metadata
 
 
-def add_overview(raster_file: str, embedded: bool = True, compression: str = "") -> None:
+def add_overview(raster_file: str, compression: str = "", embedded: bool = True) -> None:
     """
     Add overview bands to a raster file with no existing overviews.
 
@@ -105,20 +105,23 @@ def add_overview(raster_file: str, embedded: bool = True, compression: str = "")
     ----------
     raster_file: str
         Absolute full path to the raster file.
-    embedded: bool, default=True
-        If True, the overviews will be embedded in the file, otherwise stored externally.
     compression: str
         The name of compression algorithm.
+    embedded: bool, default=True
+        If True, the overviews will be embedded in the file, otherwise stored externally.
     """
     try:
         if embedded:
             ds = gdal.Open(raster_file, gdal.GA_Update)
         else:
             ds = gdal.Open(raster_file, gdal.GA_ReadOnly)
+
+        # ds = gdal.Open(raster_file, gdal.GA_Update if embedded else gdal.GA_ReadOnly)
+
         if compression:
             gdal.SetConfigOption("COMPRESS_OVERVIEW", compression)
     finally:
-        ds.BuildOverviews("NEAREST", [2, 4, 8, 16, 32], gdal.TermProgress_nocb)
+        ds.BuildOverviews("NEAREST", [2, 4, 16], gdal.TermProgress_nocb)
         ds = None
     return
 

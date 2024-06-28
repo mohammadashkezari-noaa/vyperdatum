@@ -151,7 +151,6 @@ class Transformer():
                          output_file: str,
                          apply_vertical: bool,
                          overview: bool = True,
-                         embed_overview: bool = True,
                          warp_kwargs: Optional[dict] = None,
                          ) -> bool:
         """
@@ -178,11 +177,7 @@ class Transformer():
         output_file: str
             Path to the transformed raster file.
         overview: bool, default=True
-            If True, overview bands are added to the output raster file.
-        embed_overview: bool, default=True
-            If True, the overviews will be embedded in the file, otherwise stored externally.
-            Will be ignored if `overview = False`.
-
+            If True, overview bands are added to the output raster file (only GTiff support).
 
         Returns
         --------
@@ -215,13 +210,11 @@ class Transformer():
                                                     target_crs=self.crs_to,
                                                     )
 
-
-            # raster_utils.set_nodatavalue(output_file, np.nan)
-
-            # if overview and input_metadata["driver"].lower() == "gtiff":
-            #     # TODO: double-check the overview function
-            #     # raster_utils.add_overview(output_file, embed_overview, input_metadata["compression"])
-            #     raster_utils.add_rat(output_file)
+            if overview and input_metadata["driver"].lower() == "gtiff":
+                raster_utils.add_overview(raster_file=output_file,
+                                          compression=input_metadata["compression"]
+                                          )
+                # raster_utils.add_rat(output_file)
             success = True
         finally:
             return success

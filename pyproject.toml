@@ -31,6 +31,21 @@ classifiers = [
 py-modules = ["vyperdatum"]
 
 
+[project.optional-dependencies]
+tests = [
+  "pytest",
+  "pytest-cov"
+]
+lint = [
+  "flake8",
+  "black"
+]
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme"
+]
+
+
 [project.urls]
 Documentation = "https://readthedocs.org"
 Repository = "https://github.com/mohammadashkezari-noaa/vyperdatum"
