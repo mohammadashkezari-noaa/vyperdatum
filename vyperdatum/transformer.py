@@ -150,7 +150,7 @@ class Transformer():
                          input_file: str,
                          output_file: str,
                          apply_vertical: bool,
-                         overview: bool = True,
+                         overview: bool = False,
                          warp_kwargs: Optional[dict] = None,
                          ) -> bool:
         """
@@ -196,6 +196,7 @@ class Transformer():
         try:
             success = False
             input_metadata = raster_utils.raster_metadata(input_file)
+            raster_utils.pre_transformation_checks(source_meta=input_metadata)
             raster_utils.warp(input_file=input_file,
                               output_file=output_file,
                               apply_vertical=apply_vertical,
@@ -204,11 +205,15 @@ class Transformer():
                               input_metadata=input_metadata,
                               warp_kwargs=warp_kwargs
                               )
-
-            raster_utils.post_transformation_checks(source_file=input_file,
-                                                    target_file=output_file,
+            output_metadata = raster_utils.raster_metadata(output_file)
+            raster_utils.post_transformation_checks(source_meta=input_metadata,
+                                                    target_meta=output_metadata,
                                                     target_crs=self.crs_to,
                                                     )
+            if apply_vertical and isinstance(warp_kwargs.get("srcBands"), list):
+                raster_utils.unchanged_to_nodata(src_raster_file=input_file,
+                                                 xform_raster_file=output_file,
+                                                 xform_band=warp_kwargs.get("srcBands")[0])
 
             if overview and input_metadata["driver"].lower() == "gtiff":
                 raster_utils.add_overview(raster_file=output_file,

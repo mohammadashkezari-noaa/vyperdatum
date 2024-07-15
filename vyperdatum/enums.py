@@ -20,3 +20,7 @@ class PROJDB(RootEnum):
     TABLE_GRID_TRANS = "grid_transformation"
     TABLE_OTHER_TRANS = "other_transformation"
     TABLE_CONCAT_OPS = "concatenated_operation"
+
+
+class VDATUM(RootEnum):
+    DIR = r"C:\Users\mohammad.ashkezari\Desktop\vdatum_all_20230907\vdatum"

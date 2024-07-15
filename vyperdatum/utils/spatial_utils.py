@@ -13,7 +13,7 @@ gdal.UseExceptions()
 
 def get_grid_list(vdatum_directory: str):
     """
-    Search the vdatum directory to find all gtx files
+    Return all gtx files in the vdatum directory.
 
     Parameters
     ----------
