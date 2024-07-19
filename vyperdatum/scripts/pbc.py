@@ -1,17 +1,13 @@
+import os
 import pathlib
+import glob
 from vyperdatum.transformer import Transformer
 from vyperdatum.utils.raster_utils import raster_metadata, raster_compress
 from osgeo import gdal
 import pyproj as pp
 
 
-def transform(input_file):
-    """
-    3-Step transformation:
-    EPSG:6348 >>> EPSG:6319
-    EPSG:6319 >>> EPSG:6318+NOAA:5320
-    EPSG:6318+NOAA:5320 >>> EPSG:6348+NOAA:5320
-    """
+def transform(input_file, input_crs, out_vertical):
     warp_kwargs_vertical = {
                             "outputType": gdal.gdalconst.GDT_Float32,
                             "srcBands": [1],
@@ -20,7 +16,7 @@ def transform(input_file):
                             "errorThreshold": 0,
                             }
 
-    t1 = Transformer(crs_from="EPSG:6348",
+    t1 = Transformer(crs_from=input_crs,
                      crs_to="EPSG:6319",
                      allow_ballpark=False
                      )
@@ -31,7 +27,7 @@ def transform(input_file):
                         )
 
     t2 = Transformer(crs_from="EPSG:6319",
-                     crs_to="EPSG:6318+NOAA:5320",
+                     crs_to=f"EPSG:6318+{out_vertical}",
                      allow_ballpark=False
                      )
     out_file2 = pathlib.Path(input_file).with_stem("_02_" + pathlib.Path(input_file).stem)
@@ -41,26 +37,33 @@ def transform(input_file):
                         warp_kwargs=warp_kwargs_vertical
                         )
 
-    t3 = Transformer(crs_from="EPSG:6318+NOAA:5320",
-                     crs_to="EPSG:6348+NOAA:5320",
+    t3 = Transformer(crs_from=f"EPSG:6318+{out_vertical}",
+                     crs_to=f"{input_crs}+{out_vertical}",
                      allow_ballpark=False
                      )
-    out_file3 = pathlib.Path(input_file).with_stem("_03_" + pathlib.Path(input_file).stem)
+    p = pathlib.Path(input_file)
+    xform_dir = os.path.join(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\V\Manual", p.parent.name)
+    os.makedirs(xform_dir, exist_ok=True)
+    out_file3 = os.path.join(xform_dir, p.name)
     t3.transform_raster(input_file=out_file2,
                         output_file=out_file3,
                         apply_vertical=False,
                         )
+
+    os.remove(out_file1)
+    os.remove(out_file2)
     return out_file3
 
 
 
 
 if __name__ == "__main__":
-    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\clipped_MA2204-TB-N_TPU_3band_mosaic_tpu.tif"
-    compressed_input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\compressed_clipped_MA2204-TB-N_TPU_3band_mosaic_tpu.tif"
-    input_meta = raster_metadata(input_file, verbose=True)
-    raster_compress(input_file, compressed_input_file,
-                    format=input_meta["driver"], compression="DEFLATE")
-
-    transformed_file = transform(compressed_input_file)
-    transformed_meta = raster_metadata(transformed_file, verbose=True)
+    files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\V\Original\**\*.tif", recursive=True)
+    for i, input_file in enumerate(files):
+        print(f"{i+1}/{len(files)}: {input_file}")
+        if os.path.basename(input_file).startswith("MA"):
+            transformed_file = transform(input_file, input_crs="EPSG:6348", out_vertical="NOAA:5320")
+        elif os.path.basename(input_file).startswith("ma"):
+            transformed_file = transform(input_file, input_crs="EPSG:26919", out_vertical="NOAA:5320")
+        elif os.path.basename(input_file).startswith("ct") or os.path.basename(input_file).startswith("rh"):
+            transformed_file = transform(input_file, input_crs="EPSG:26919", out_vertical="NOAA:5434")

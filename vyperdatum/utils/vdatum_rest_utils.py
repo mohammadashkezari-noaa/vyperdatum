@@ -5,14 +5,17 @@ import numpy as np
 from osgeo import gdal
 from typing import Optional
 import pyproj as pp
+import difflib
+from vyperdatum.enums import VDATUM
+
 
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
 
 
 def vdatum_transform_point(s_x, s_y, s_z, region,
-                           s_h_frame, s_v_frame,
-                           t_h_frame, t_v_frame,
+                           s_h_frame, s_v_frame, s_h_zone,
+                           t_h_frame, t_v_frame, t_h_zone,
                            s_v_goid="geoid18",
                            t_v_goid="geoid18",
                            ):
@@ -64,7 +67,9 @@ def vdatum_transform_point(s_x, s_y, s_z, region,
     url = "https://vdatum.noaa.gov/vdatumweb/api/convert"
     params = dict(s_x=s_x, s_y=s_y, s_z=s_z, region=region,
                   s_h_frame=s_h_frame, s_v_frame=s_v_frame,
+                  s_h_zone=s_h_zone if s_h_zone else "",
                   t_h_frame=t_h_frame, t_v_frame=t_v_frame,
+                  t_h_zone=t_h_zone if t_h_zone else "",
                   s_v_goid=s_v_goid, t_v_goid=t_v_goid)
     try:
         resp = requests.get(url, params=params, timeout=200).json()
@@ -108,6 +113,30 @@ def api_region_alias(region: str):
     return api_region
 
 
+def wkt_to_utm(wkt: str) -> Optional[str]:
+    """
+    Receives WKT and returns the UTM zone, if applicable.
+
+    Parameters
+    ------------
+    wkt: str
+         WKT string
+
+    Returns
+    ------------
+    Optional[str]
+         UTM zone
+    """
+    zone = None
+    input_crs = pp.CRS(wkt)
+    if not input_crs.is_projected:
+        return zone
+    input_crs = input_crs.name.split("+")[0].strip()
+    if len(input_crs.split("/ UTM zone ")) == 2:
+        zone = input_crs.split("/ UTM zone ")[1].strip()
+    return zone
+
+
 def wkt_to_crs(wkt: str) -> tuple[Optional[str], Optional[str]]:
     """
     Receives WKT and returns the horizontal/vertical CRS names.
@@ -115,7 +144,7 @@ def wkt_to_crs(wkt: str) -> tuple[Optional[str], Optional[str]]:
     Parameters
     ------------
     wkt: str
-         WKT string.
+         WKT string
 
     Returns
     ------------
@@ -132,11 +161,17 @@ def wkt_to_crs(wkt: str) -> tuple[Optional[str], Optional[str]]:
     return horizontal_crs.name, vertical_crs.name if vertical_crs else None
 
 
-def api_crs_alias(wkt: str):
+def api_crs_aliases(wkt: str) -> tuple[str, str]:
     """
     Vdatum REST api uses different CRS names compared to those
     of the PROJ/pyproj. This function expects to receive a CRS WKT
-    and returns a CRS name that is consumable by the vdatum REST api.
+    and returns horizontal and vertical CRS names that are consumable
+    by the vdatum REST api.
+
+    Raises
+    ------------
+    ValueError
+         When the standard CRS name can't be matched with any Vdatum API CRS names.
 
     Parameters
     ------------
@@ -145,18 +180,31 @@ def api_crs_alias(wkt: str):
 
     Returns
     ------------
-    str
-        CRS name that is consumable by the vdatum REST api.
+    tuple[str, str]
+        Horizontal and vertical CRS names that are consumable by the vdatum REST api.
     """
-    # h_crs, v_crs = wkt_to_crs(wkt)
-    raise NotImplementedError("""The api crs naming are quite arbitrary and doesn't have
-                              documentation on how to handle different projected crs such as 
-                              MTM, BLM, MTQ, UTM, ... (I queried database to get some of the 
-                              existing projections). I don't think we can robustly implement
-                              this function. Will come back to if found a solution. For now
-                              I will transform the sampled points from both source and target
-                              to a common horizontal crs such as NAD83(2011).""")
-    return
+    h_crs, v_crs = wkt_to_crs(wkt)
+    h_crs = h_crs.split("/")[0].strip()
+    h_matches = difflib.get_close_matches(h_crs, VDATUM.H_FRAMES.value)
+    if len(h_matches) == 0:
+        raise ValueError(f"No Vdatum horizontal CRS name matched with '{h_crs}'")
+    h_crs = h_matches[0]
+
+    v_crs_black = ["HRD"]
+    if v_crs and v_crs.split()[0].upper().strip() in v_crs_black:
+        raise ValueError(f"The raster's vertical CRS is '{v_crs}' which is not covered by Vdatum.")
+
+    if not v_crs:
+        v_crs = h_crs
+    else:
+        v_matches = difflib.get_close_matches(v_crs, VDATUM.V_FRAMES.value)
+        if len(v_matches) == 0:            
+            v_matches = difflib.get_close_matches(v_crs.split()[0].strip(), VDATUM.V_FRAMES.value)
+        if len(v_matches) == 0:
+            v_matches = difflib.get_close_matches(v_crs.split()[0].strip(), VDATUM.V_FRAMES.value)
+            raise ValueError(f"No Vdatum vertical CRS name matched with '{v_crs}'")
+        v_crs = v_matches[0]
+    return h_crs, v_crs
 
 
 def index_to_xy(i: int, j: int, geot: tuple):
@@ -187,9 +235,9 @@ def index_to_xy(i: int, j: int, geot: tuple):
 def sample_raster(source_meta: dict,
                   target_meta: dict,
                   n_sample: int,
-                  sampling_band: int = 1,
-                  common_h_crs: Optional[str] = None
-                  ):
+                  sampling_band: int,
+                  common_h_crs: Optional[str]
+                  ) -> tuple[list, list]:
     """
     Randomly draw `n_samples` points (not NoDataValue) from the `sampling_band`
     of the source and target rasters.
@@ -207,6 +255,7 @@ def sample_raster(source_meta: dict,
     common_h_crs: Optional[str]
         When not None, both source and target samples are transformed
         into a common horizontal CRS, otherwise ignored (default None).
+        Example: common_h_crs = 'EPSG:6318'
 
     Raises
     -------
@@ -252,6 +301,11 @@ def sample_raster(source_meta: dict,
                                                      pp.CRS(common_h_crs),
                                                      always_xy=True
                                                      )
+        for i, p in enumerate(source_samples):
+            lon, lat = source_transformer.transform(p[0], p[1])
+            p[0], p[1] = lon, lat
+            lon, lat = target_transformer.transform(target_samples[i][0], target_samples[i][1])
+            target_samples[i][0], target_samples[i][1] = lon, lat
     return source_samples, target_samples
 
 
@@ -262,8 +316,10 @@ def vdatum_raster_cross_validate(source_meta: dict,
                                  region: Optional[str] = None,
                                  s_h_frame: Optional[str] = None,
                                  s_v_frame: Optional[str] = None,
+                                 s_h_zone: Optional[str] = None,
                                  t_h_frame: Optional[str] = None,
-                                 t_v_frame: Optional[str] = None
+                                 t_v_frame: Optional[str] = None,
+                                 t_h_zone: Optional[str] = None
                                  ):
     """
     Randomly sample the source raster points and transform them to the
@@ -290,41 +346,90 @@ def vdatum_raster_cross_validate(source_meta: dict,
     if not region:
         region = "contiguous"
         if len(source_meta["overlapping_regions"]) != 1:
-            passed = False
-            logger.warning(">>>>> Warning <<<<< The raster is not overlapping with a single region. "
-                           f"The overlapping regions: ({source_meta['overlapping_regions']}).")
+            # passed = False
+            logger.warning(">>>>> Warning <<<<< The input is not overlapping with a single region."
+                           f" The overlapping regions: ({source_meta['overlapping_regions']}).")
         else:
             region = api_region_alias(source_meta["overlapping_regions"][0])
 
     source_crs_h, source_crs_v = wkt_to_crs(source_meta["wkt"])
+    source_zone_h = wkt_to_utm(source_meta["wkt"])
     target_crs_h, target_crs_v = wkt_to_crs(target_meta["wkt"])
-    if source_crs_h != target_crs_h:
-        passed = False
-        logger.warning(">>>>> Warning <<<<< The source and target horizontal CRS don't match. "
-                       f"\n\tSource horizontal crs: {source_crs_h}."
-                       f"\n\tTarget horizontal crs: {target_crs_h}.")
+    target_zone_h = wkt_to_utm(target_meta["wkt"])
+
+    # if source_crs_h != target_crs_h:
+    #     passed = False
+    #     logger.warning(">>>>> Warning <<<<< The source and target horizontal CRS don't match. "
+    #                    f"\n\tSource horizontal crs: {source_crs_h}."
+    #                    f"\n\tTarget horizontal crs: {target_crs_h}.")
+
+    if not (s_h_frame and s_v_frame):
+        source_crs_h, source_crs_v = api_crs_aliases(source_meta["wkt"])
+    if not (t_h_frame and t_v_frame):
+        target_crs_h, target_crs_v = api_crs_aliases(target_meta["wkt"])
 
     source_samples, target_samples = sample_raster(source_meta, target_meta,
-                                                   n_sample, sampling_band)
+                                                   n_sample, sampling_band,
+                                                   common_h_crs=None)
 
-
-    # points, resp = vdatum_transform_point(s_x=xx, s_y=yy, s_z=zz, region=region,
-    #                                       s_h_frame="NAD83_2011", s_v_frame="MLLW",
-    #                                       t_h_frame="NAD83_2011", t_v_frame="NAVD88")
-    
-
-    # target_auth = target_crs.to_authority()
-    # transformed_auth = pp.CRS(target_meta["wkt"]).to_authority()
-    # if target_auth != transformed_auth:
-    #     passed = False
-    #     logger.warning(">>>>> Warning <<<<< The expected authority code/name of the "
-    #                    f"transformed raster is {target_auth}, but received {transformed_auth}"
-    #                    )
+    for i, p in enumerate(source_samples):
+        points, resp = vdatum_transform_point(s_x=p[0], s_y=p[1], s_z=p[2],
+                                              region=region,
+                                              s_h_frame=s_h_frame or source_crs_h,
+                                              s_v_frame=s_v_frame or source_crs_v,
+                                              s_h_zone=s_h_zone or source_zone_h,
+                                              t_h_frame=t_h_frame or target_crs_h,
+                                              t_v_frame=t_v_frame or target_crs_v,
+                                              t_h_zone=t_h_zone or target_zone_h)
+        print(f"""Source: ({p[0], p[1], p[2]})
+            Target: ({target_samples[i][0], target_samples[i][1], target_samples[i][2]})
+            Vdatum: ({points[0], points[1], points[2]})""")
+        print(">>>>>>>>>>>>")
+        print(resp)
 
     return passed
 
 
 if __name__ == "__main__":
+    from vyperdatum.utils.raster_utils import raster_metadata
+    import sys
+
+    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NVD\VA_input.tif"
+    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NVD\_transformed_VA_input.tif"
+
+    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\clipped_MA2204-TB-N_TPU_3band_mosaic_tpu.tif"
+    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\_03_clipped_MA2204-TB-N_TPU_3band_mosaic_tpu.tif"
+
+    # FAILS: VDATUM DOESNOT HAVE HRD ... WILL BE MIXED WITH HRD  ... ALSO CHECK WGS84_G873 
+    input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\HRD\Tile1_PBC18_4m_20211001_145447.tif"
+    # input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\HRD\_03_6318_5703_Tile1_PBC18_4m_20211001_145447.tif"
+
+    # input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BC25L26L\Modeling_BC25L26L_20230919.tiff"
+    # input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\BlueTopo\BC25L26L\_03_6318_5703_Modeling_BC25L26L_20230919.tiff"
+
+    # input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PRVD\PBG19\Modeling_BC26H26C_20240304_20240501190016\Modeling_BC26H26C_20240304.tiff"
+
+    # meta = raster_metadata(input_file, verbose=True)
+    # print(api_crs_aliases(meta["wkt"]))
+
+
+    s_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\clipped_MA2204-TB-N_TPU_3band_mosaic_tpu.tif"
+    t_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\_03_clipped_MA2204-TB-N_TPU_3band_mosaic_tpu.tif"
+
+    vdatum_raster_cross_validate(source_meta=raster_metadata(s_file),
+                                 target_meta=raster_metadata(t_file),
+                                 n_sample=1,
+                                 sampling_band=1,
+                                 region=None,
+                                 s_h_frame=None,
+                                 s_v_frame=None,
+                                 s_h_zone=None,
+                                 t_h_frame=None,
+                                 t_v_frame=None,
+                                 t_h_zone=None
+                                 )
+    sys.exit()
+    ###############################################
     # expected output
     tx, ty, tz = -70.7, 43, -1.547
     # input values

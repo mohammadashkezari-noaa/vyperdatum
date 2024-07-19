@@ -193,6 +193,7 @@ class Transformer():
 
         if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
             raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
+
         try:
             success = False
             input_metadata = raster_utils.raster_metadata(input_file)
