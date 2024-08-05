@@ -236,7 +236,7 @@ def raster_compress(raster_file_path: str,
     """
     translate_kwargs = {"format": format,
                         "creationOptions": [f"COMPRESS={compression}",
-                                            "BIGTIFF=IF_NEEDED",
+                                            f"BIGTIFF={'YES' if os.path.getsize(raster_file_path) > 3e9 else 'IF_NEEDED'}",
                                             "TILED=YES"
                                             ]
                         }

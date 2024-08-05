@@ -211,10 +211,10 @@ class Transformer():
                                                     target_meta=output_metadata,
                                                     target_crs=self.crs_to,
                                                     )
-            if apply_vertical and isinstance(warp_kwargs.get("srcBands"), list):
-                raster_utils.unchanged_to_nodata(src_raster_file=input_file,
-                                                 xform_raster_file=output_file,
-                                                 xform_band=warp_kwargs.get("srcBands")[0])
+            # if apply_vertical and isinstance(warp_kwargs.get("srcBands"), list):
+            #     raster_utils.unchanged_to_nodata(src_raster_file=input_file,
+            #                                      xform_raster_file=output_file,
+            #                                      xform_band=warp_kwargs.get("srcBands")[0])
 
             if overview and input_metadata["driver"].lower() == "gtiff":
                 raster_utils.add_overview(raster_file=output_file,

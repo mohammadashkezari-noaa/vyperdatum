@@ -55,8 +55,6 @@ def transform(input_file, input_crs, out_vertical):
     return out_file3
 
 
-
-
 if __name__ == "__main__":
     files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\V\Original\**\*.tif", recursive=True)
     for i, input_file in enumerate(files):
