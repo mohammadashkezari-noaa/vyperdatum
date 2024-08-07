@@ -239,7 +239,7 @@ def transform_VA_MD_short(input_file):
 
 if __name__ == "__main__":
     files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\**\*.tif", recursive=True)
-    for i, input_file in enumerate(files[11:]):
+    for i, input_file in enumerate(files):
         print(f"{i+1}/{len(files)}: {input_file}")
         if os.path.basename(input_file).startswith("NC"):
             transformed_file = transform_NC(input_file)

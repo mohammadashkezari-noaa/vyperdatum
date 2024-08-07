@@ -210,6 +210,7 @@ class Transformer():
             raster_utils.post_transformation_checks(source_meta=input_metadata,
                                                     target_meta=output_metadata,
                                                     target_crs=self.crs_to,
+                                                    vertical_transform=apply_vertical
                                                     )
             # if apply_vertical and isinstance(warp_kwargs.get("srcBands"), list):
             #     raster_utils.unchanged_to_nodata(src_raster_file=input_file,
