@@ -388,7 +388,7 @@ def pre_transformation_checks(source_meta: dict):
     if source_meta["bands"] != 3:
         passed = False
         logger.warning(">>>>> Warning <<<<< Number of bands in the raster file: "
-                       f"({source_meta['bands']}). NBS rasters typically contain 3 bands")
+                       f"{source_meta['bands']}. NBS rasters typically contain 3 bands")
     if len(source_meta["overlapping_regions"]) != 1:
         passed = False
         logger.warning(">>>>> Warning <<<<< The raster is not overlapping with a single region. "
