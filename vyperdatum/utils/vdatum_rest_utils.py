@@ -37,7 +37,7 @@ def vdatum_transform_point(s_x, s_y, s_z, region,
         Source point height
     region: str
         Vdatum region name (e.g. ak, as, contiguous, gcnmi, prvi)
-        https://vdatum.noaa.gov/docs/services.html#step140.
+        https://vdatum.noaa.gov/docs/services.html#step140
     s_h_frame: str
         Source horizontal reference frame (e.g. NAD83_2011)
         https://vdatum.noaa.gov/docs/services.html#step150
@@ -345,7 +345,7 @@ def vdatum_cross_validate_raster(s_file: str,
         The index of the source band to be sampled (default 1).
     region: Optional[str]
         Vdatum region name (e.g. ak, as, contiguous, gcnmi, prvi)
-        https://vdatum.noaa.gov/docs/services.html#step140.
+        https://vdatum.noaa.gov/docs/services.html#step140
     pivot_h_crs: Optional[str]
         When not None, both source and target samples are transformed
         into a common horizontal CRS, otherwise ignored (default None).
@@ -368,6 +368,7 @@ def vdatum_cross_validate_raster(s_file: str,
     t_h_zone: Optional[str]
         Target CRS zone, if projected.
         The details of this parameter is not documented in vdatum services page.
+
     Returns
     ----------
     bool

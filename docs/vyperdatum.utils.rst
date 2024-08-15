@@ -28,6 +28,14 @@ vyperdatum.utils.spatial\_utils module
    :undoc-members:
    :show-inheritance:
 
+vyperdatum.utils.vdatum\_rest\_utils module
+-------------------------------------------
+
+.. automodule:: vyperdatum.utils.vdatum_rest_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

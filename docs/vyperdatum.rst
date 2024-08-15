@@ -7,7 +7,6 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   vyperdatum.scripts
    vyperdatum.utils
 
 Submodules

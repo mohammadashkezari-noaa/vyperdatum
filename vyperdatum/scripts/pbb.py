@@ -26,7 +26,7 @@ def transform(input_file):
                             "outputType": gdal.gdalconst.GDT_Float32,
                             "srcBands": [1],
                             "dstBands": [1],
-                            "warpOptions": ["APPLY_VERTICAL_SHIFT=YES"],
+                            "warpOptions": ["APPLY_VERTICAL_SHIFT=YES", "SAMPLE_GRID=YES", "SAMPLE_STEPS=ALL"],
                             "errorThreshold": 0,
                             }
 
