@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>vyperdatum package &mdash; Vyperdatum 0.1.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=a58bc63e"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="vyperdatum.utils package" href="vyperdatum.utils.html" />
+    <link rel="prev" title="vyperdatum" href="modules.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Vyperdatum
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">vyperdatum</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">vyperdatum package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#subpackages">Subpackages</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="vyperdatum.utils.html">vyperdatum.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-vyperdatum.db">vyperdatum.db module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#vyperdatum.db.DB"><code class="docutils literal notranslate"><span class="pre">DB</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-vyperdatum.enums">vyperdatum.enums module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#vyperdatum.enums.PROJDB"><code class="docutils literal notranslate"><span class="pre">PROJDB</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vyperdatum.enums.RootEnum"><code class="docutils literal notranslate"><span class="pre">RootEnum</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vyperdatum.enums.VDATUM"><code class="docutils literal notranslate"><span class="pre">VDATUM</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-vyperdatum.transformer">vyperdatum.transformer module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#vyperdatum.transformer.Transformer"><code class="docutils literal notranslate"><span class="pre">Transformer</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-vyperdatum">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Vyperdatum</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">vyperdatum</a></li>
+      <li class="breadcrumb-item active">vyperdatum package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/vyperdatum.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="vyperdatum-package">
+<h1>vyperdatum package<a class="headerlink" href="#vyperdatum-package" title="Link to this heading"></a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="vyperdatum.utils.html">vyperdatum.utils package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vyperdatum.utils.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vyperdatum.utils.html#module-vyperdatum.utils.npz">vyperdatum.utils.npz module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.npz.NPZ"><code class="docutils literal notranslate"><span class="pre">NPZ</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.npz.NPZ.load"><code class="docutils literal notranslate"><span class="pre">NPZ.load()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.npz.NPZ.minmax"><code class="docutils literal notranslate"><span class="pre">NPZ.minmax()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.npz.NPZ.wkt"><code class="docutils literal notranslate"><span class="pre">NPZ.wkt()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.npz.NPZ.xyzu"><code class="docutils literal notranslate"><span class="pre">NPZ.xyzu()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vyperdatum.utils.html#module-vyperdatum.utils.raster_utils">vyperdatum.utils.raster_utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.add_overview"><code class="docutils literal notranslate"><span class="pre">add_overview()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.add_rat"><code class="docutils literal notranslate"><span class="pre">add_rat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.band_stats"><code class="docutils literal notranslate"><span class="pre">band_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.crs_to_code_auth"><code class="docutils literal notranslate"><span class="pre">crs_to_code_auth()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.post_transformation_checks"><code class="docutils literal notranslate"><span class="pre">post_transformation_checks()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.pre_transformation_checks"><code class="docutils literal notranslate"><span class="pre">pre_transformation_checks()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.raster_compress"><code class="docutils literal notranslate"><span class="pre">raster_compress()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.raster_metadata"><code class="docutils literal notranslate"><span class="pre">raster_metadata()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.set_nodatavalue"><code class="docutils literal notranslate"><span class="pre">set_nodatavalue()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.unchanged_to_nodata"><code class="docutils literal notranslate"><span class="pre">unchanged_to_nodata()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.raster_utils.warp"><code class="docutils literal notranslate"><span class="pre">warp()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vyperdatum.utils.html#module-vyperdatum.utils.spatial_utils">vyperdatum.utils.spatial_utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.spatial_utils.get_grid_list"><code class="docutils literal notranslate"><span class="pre">get_grid_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.spatial_utils.get_region_polygons"><code class="docutils literal notranslate"><span class="pre">get_region_polygons()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.spatial_utils.overlapping_extents"><code class="docutils literal notranslate"><span class="pre">overlapping_extents()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.spatial_utils.overlapping_regions"><code class="docutils literal notranslate"><span class="pre">overlapping_regions()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vyperdatum.utils.html#module-vyperdatum.utils.vdatum_rest_utils">vyperdatum.utils.vdatum_rest_utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.vdatum_rest_utils.api_crs_aliases"><code class="docutils literal notranslate"><span class="pre">api_crs_aliases()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.vdatum_rest_utils.api_region_alias"><code class="docutils literal notranslate"><span class="pre">api_region_alias()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.vdatum_rest_utils.index_to_xy"><code class="docutils literal notranslate"><span class="pre">index_to_xy()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.vdatum_rest_utils.sample_raster"><code class="docutils literal notranslate"><span class="pre">sample_raster()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.vdatum_rest_utils.vdatum_cross_validate_raster"><code class="docutils literal notranslate"><span class="pre">vdatum_cross_validate_raster()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.vdatum_rest_utils.vdatum_transform_point"><code class="docutils literal notranslate"><span class="pre">vdatum_transform_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.vdatum_rest_utils.wkt_to_crs"><code class="docutils literal notranslate"><span class="pre">wkt_to_crs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vyperdatum.utils.html#vyperdatum.utils.vdatum_rest_utils.wkt_to_utm"><code class="docutils literal notranslate"><span class="pre">wkt_to_utm()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vyperdatum.utils.html#module-vyperdatum.utils">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-vyperdatum.db">
+<span id="vyperdatum-db-module"></span><h2>vyperdatum.db module<a class="headerlink" href="#module-vyperdatum.db" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="vyperdatum.db.DB">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">vyperdatum.db.</span></span><span class="sig-name descname"><span class="pre">DB</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'c:\\Pydro24_Dev\\envs\\Pydro3_11\\Library\\share\\proj'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vyperdatum/db.html#DB"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.db.DB" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="vyperdatum.db.DB.crs_by_keyword">
+<span class="sig-name descname"><span class="pre">crs_by_keyword</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">keywords</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataframe</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/vyperdatum/db.html#DB.crs_by_keyword"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.db.DB.crs_by_keyword" title="Link to this definition"></a></dt>
+<dd><p>Return a list (or dataframe) of CRS that their name or description
+contain the passed keywords. The search is not case-sensitive.</p>
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>sql: str</dt><dd><p>SQL query (intended to be a scan query) to be executed.</p>
+</dd>
+<dt>keywords: list[str]</dt><dd><p>A list of string keywords used to query the database.</p>
+</dd>
+<dt>dataframe: bool, default=False</dt><dd><p>If True, converts the result into a pandas dataframe.</p>
+</dd>
+</dl>
+</section>
+<section id="raises">
+<h3>Raises<a class="headerlink" href="#raises" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>TypeError:</dt><dd><p>If <cite>keywords</cite> is not a list of strings.</p>
+</dd>
+<dt>ValueError:</dt><dd><p>If no keywords is passed.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h3>Returns<a class="headerlink" href="#returns" title="Link to this heading"></a></h3>
+<p>list or pd.DataFrame</p>
+</section>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="vyperdatum.db.DB.db_file_path">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">db_file_path</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#vyperdatum.db.DB.db_file_path" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vyperdatum.db.DB.query">
+<span class="sig-name descname"><span class="pre">query</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sql</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataframe</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">DataFrame</span></span></span><a class="reference internal" href="_modules/vyperdatum/db.html#DB.query"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.db.DB.query" title="Link to this definition"></a></dt>
+<dd><p>Execute a sql query and return the response. This method is intended
+to run a read (scan) query.
+Avoid using this method for DML/DDL type operations.</p>
+<section id="id1">
+<h3>Parameters<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>sql: str</dt><dd><p>SQL query (intended to be a scan query) to be executed.</p>
+</dd>
+<dt>dataframe: bool, default=False</dt><dd><p>If True, converts the result into a pandas dataframe.</p>
+</dd>
+</dl>
+</section>
+<section id="id2">
+<h3>Returns<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<p>list or pd.DataFrame</p>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vyperdatum.db.DB.update_db_path">
+<span class="sig-name descname"><span class="pre">update_db_path</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/vyperdatum/db.html#DB.update_db_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.db.DB.update_db_path" title="Link to this definition"></a></dt>
+<dd><p>Prepend <cite>self.db_dir</cite> to <cite>pyproj.datadir</cite> which guides the pyproj
+to first look for the database at <cite>self.db_dir</cite> address.</p>
+<section id="id3">
+<h3>Raises<a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>ValueError:</dt><dd><p>If <cite>.db_dir</cite> is not set.</p>
+</dd>
+<dt>FileNotFoundError:</dt><dd><p>If the database file is not found.</p>
+</dd>
+</dl>
+</section>
+<section id="id4">
+<h3>Returns<a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>bool:</dt><dd><p><cite>True</cite> if the <cite>data_dir</cite> is set successfully, otherwise <cite>False</cite>.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-vyperdatum.enums">
+<span id="vyperdatum-enums-module"></span><h2>vyperdatum.enums module<a class="headerlink" href="#module-vyperdatum.enums" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="vyperdatum.enums.PROJDB">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">vyperdatum.enums.</span></span><span class="sig-name descname"><span class="pre">PROJDB</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vyperdatum/enums.html#PROJDB"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.enums.PROJDB" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#vyperdatum.enums.RootEnum" title="vyperdatum.enums.RootEnum"><code class="xref py py-class docutils literal notranslate"><span class="pre">RootEnum</span></code></a></p>
+<p>Proj db attributes.</p>
+<section id="attributes">
+<h3>Attributes<a class="headerlink" href="#attributes" title="Link to this heading"></a></h3>
+<p>FILE_NAME</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.PROJDB.FILE_NAME">
+<span class="sig-name descname"><span class="pre">FILE_NAME</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'proj.db'</span></em><a class="headerlink" href="#vyperdatum.enums.PROJDB.FILE_NAME" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.PROJDB.TABLE_CONCAT_OPS">
+<span class="sig-name descname"><span class="pre">TABLE_CONCAT_OPS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'concatenated_operation'</span></em><a class="headerlink" href="#vyperdatum.enums.PROJDB.TABLE_CONCAT_OPS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.PROJDB.TABLE_GRID_TRANS">
+<span class="sig-name descname"><span class="pre">TABLE_GRID_TRANS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'grid_transformation'</span></em><a class="headerlink" href="#vyperdatum.enums.PROJDB.TABLE_GRID_TRANS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.PROJDB.TABLE_OTHER_TRANS">
+<span class="sig-name descname"><span class="pre">TABLE_OTHER_TRANS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'other_transformation'</span></em><a class="headerlink" href="#vyperdatum.enums.PROJDB.TABLE_OTHER_TRANS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.PROJDB.TABLE_VERTICAL_CRS">
+<span class="sig-name descname"><span class="pre">TABLE_VERTICAL_CRS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'vertical_crs'</span></em><a class="headerlink" href="#vyperdatum.enums.PROJDB.TABLE_VERTICAL_CRS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.PROJDB.VIEW_CRS">
+<span class="sig-name descname"><span class="pre">VIEW_CRS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'crs_view'</span></em><a class="headerlink" href="#vyperdatum.enums.PROJDB.VIEW_CRS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vyperdatum.enums.RootEnum">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">vyperdatum.enums.</span></span><span class="sig-name descname"><span class="pre">RootEnum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vyperdatum/enums.html#RootEnum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.enums.RootEnum" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vyperdatum.enums.VDATUM">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">vyperdatum.enums.</span></span><span class="sig-name descname"><span class="pre">VDATUM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vyperdatum/enums.html#VDATUM"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.enums.VDATUM" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#vyperdatum.enums.RootEnum" title="vyperdatum.enums.RootEnum"><code class="xref py py-class docutils literal notranslate"><span class="pre">RootEnum</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.VDATUM.DIR">
+<span class="sig-name descname"><span class="pre">DIR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'C:\\Users\\mohammad.ashkezari\\Desktop\\vdatum_all_20230907\\vdatum'</span></em><a class="headerlink" href="#vyperdatum.enums.VDATUM.DIR" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.VDATUM.H_FRAMES">
+<span class="sig-name descname"><span class="pre">H_FRAMES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['NAD27',</span> <span class="pre">'NAD83_1986',</span> <span class="pre">'NAD83_2011',</span> <span class="pre">'NAD83_NSRS2007',</span> <span class="pre">'NAD83_MARP00',</span> <span class="pre">'NAD83_PACP00',</span> <span class="pre">'WGS84_G1674',</span> <span class="pre">'ITRF2014',</span> <span class="pre">'IGS14',</span> <span class="pre">'ITRF2008',</span> <span class="pre">'IGS08',</span> <span class="pre">'ITRF2005',</span> <span class="pre">'IGS2005',</span> <span class="pre">'WGS84_G1150',</span> <span class="pre">'ITRF2000',</span> <span class="pre">'IGS00',</span> <span class="pre">'IGb00',</span> <span class="pre">'ITRF96',</span> <span class="pre">'WGS84_G873',</span> <span class="pre">'ITRF94',</span> <span class="pre">'ITRF93',</span> <span class="pre">'ITRF92',</span> <span class="pre">'SIOMIT92',</span> <span class="pre">'WGS84_G730',</span> <span class="pre">'ITRF91',</span> <span class="pre">'ITRF90',</span> <span class="pre">'ITRF89',</span> <span class="pre">'ITRF88',</span> <span class="pre">'WGS84_TRANSIT',</span> <span class="pre">'WGS84_G1762',</span> <span class="pre">'WGS84_G2139']</span></em><a class="headerlink" href="#vyperdatum.enums.VDATUM.H_FRAMES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vyperdatum.enums.VDATUM.V_FRAMES">
+<span class="sig-name descname"><span class="pre">V_FRAMES</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">['NAVD88',</span> <span class="pre">'NGVD29',</span> <span class="pre">'ASVD02',</span> <span class="pre">'W0_USGG2012',</span> <span class="pre">'GUVD04',</span> <span class="pre">'NMVD03',</span> <span class="pre">'PRVD02',</span> <span class="pre">'VIVD09',</span> <span class="pre">'CRD',</span> <span class="pre">'EGM2008',</span> <span class="pre">'EGM1996',</span> <span class="pre">'EGM1984',</span> <span class="pre">'XGEOID16B',</span> <span class="pre">'XGEOID17B',</span> <span class="pre">'XGEOID18B',</span> <span class="pre">'XGEOID19B',</span> <span class="pre">'XGEOID20B',</span> <span class="pre">'IGLD85',</span> <span class="pre">'LWD_IGLD85',</span> <span class="pre">'OHWM_IGLD85',</span> <span class="pre">'CRD',</span> <span class="pre">'LMSL',</span> <span class="pre">'MLLW',</span> <span class="pre">'MLW',</span> <span class="pre">'MTL',</span> <span class="pre">'DTL',</span> <span class="pre">'MHW',</span> <span class="pre">'MHHW',</span> <span class="pre">'LWD',</span> <span class="pre">'NAD27',</span> <span class="pre">'NAD83_1986',</span> <span class="pre">'NAD83_2011',</span> <span class="pre">'NAD83_NSRS2007',</span> <span class="pre">'NAD83_MARP00',</span> <span class="pre">'NAD83_PACP00',</span> <span class="pre">'WGS84_G1674',</span> <span class="pre">'ITRF2014',</span> <span class="pre">'IGS14',</span> <span class="pre">'ITRF2008',</span> <span class="pre">'IGS08',</span> <span class="pre">'ITRF2005',</span> <span class="pre">'IGS2005',</span> <span class="pre">'WGS84_G1150',</span> <span class="pre">'ITRF2000',</span> <span class="pre">'IGS00',</span> <span class="pre">'IGb00',</span> <span class="pre">'ITRF96',</span> <span class="pre">'WGS84_G873',</span> <span class="pre">'ITRF94',</span> <span class="pre">'ITRF93',</span> <span class="pre">'ITRF92',</span> <span class="pre">'SIOMIT92',</span> <span class="pre">'WGS84_G730',</span> <span class="pre">'ITRF91',</span> <span class="pre">'ITRF90',</span> <span class="pre">'ITRF89',</span> <span class="pre">'ITRF88',</span> <span class="pre">'WGS84_TRANSIT',</span> <span class="pre">'WGS84_G1762',</span> <span class="pre">'WGS84_G2139']</span></em><a class="headerlink" href="#vyperdatum.enums.VDATUM.V_FRAMES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-vyperdatum.transformer">
+<span id="vyperdatum-transformer-module"></span><h2>vyperdatum.transformer module<a class="headerlink" href="#module-vyperdatum.transformer" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="vyperdatum.transformer.Transformer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">vyperdatum.transformer.</span></span><span class="sig-name descname"><span class="pre">Transformer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">crs_from</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">CRS</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crs_to</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">CRS</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">always_xy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">area_of_interest</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">AreaOfInterest</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">authority</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accuracy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_ballpark</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_over</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">only_best</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vyperdatum/transformer.html#Transformer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.transformer.Transformer" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="vyperdatum.transformer.Transformer.gdal_extensions">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">gdal_extensions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/vyperdatum/transformer.html#Transformer.gdal_extensions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.transformer.Transformer.gdal_extensions" title="Link to this definition"></a></dt>
+<dd><p>Return a lower-cased list of driver names supported by gdal.</p>
+<section id="id5">
+<h3>Returns<a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
+<p>list[str]</p>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vyperdatum.transformer.Transformer.transform_points">
+<span class="sig-name descname"><span class="pre">transform_points</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vyperdatum/transformer.html#Transformer.transform_points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.transformer.Transformer.transform_points" title="Link to this definition"></a></dt>
+<dd><p>Conduct point transformation between two coordinate reference systems.</p>
+<section id="id6">
+<h3>Parameters<a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>x: numeric scalar or array</dt><dd><p>Input x coordinate(s).</p>
+</dd>
+<dt>y: numeric scalar or array</dt><dd><p>Input y coordinate(s).</p>
+</dd>
+<dt>z: numeric scalar or array, optional</dt><dd><p>Input z coordinate(s).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vyperdatum.transformer.Transformer.transform_raster">
+<span class="sig-name descname"><span class="pre">transform_raster</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">apply_vertical</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overview</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">warp_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">final_step</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/vyperdatum/transformer.html#Transformer.transform_raster"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.transformer.Transformer.transform_raster" title="Link to this definition"></a></dt>
+<dd><p>Transform the gdal-supported input rater file (<cite>input_file</cite>) and store the
+transformed file on the local disk (<cite>output_file</cite>).</p>
+<section id="id7">
+<h3>Raises<a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>ValueError:</dt><dd><p>If <cite>.crs_input</cite> or <cite>.crs_output</cite> is not set.</p>
+</dd>
+<dt>FileNotFoundError:</dt><dd><p>If the input raster file is not found.</p>
+</dd>
+<dt>NotImplementedError:</dt><dd><p>If the input vector file is not supported by gdal.</p>
+</dd>
+</dl>
+</section>
+<section id="id8">
+<h3>Parameters<a class="headerlink" href="#id8" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>input_file: str</dt><dd><p>Path to the input raster file (gdal supported).</p>
+</dd>
+<dt>output_file: str</dt><dd><p>Path to the transformed raster file.</p>
+</dd>
+<dt>apply_vertical: bool</dt><dd><p>Apply GDAL vertical shift.</p>
+</dd>
+<dt>output_file: str</dt><dd><p>Path to the transformed raster file.</p>
+</dd>
+<dt>overview: bool, default=True</dt><dd><p>If True, overview bands are added to the output raster file (only GTiff support).</p>
+</dd>
+<dt>final_step: bool</dt><dd><p>True for the final step of a multi-step transformations, otherwise False.</p>
+</dd>
+</dl>
+</section>
+<section id="id9">
+<h3>Returns<a class="headerlink" href="#id9" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>bool:</dt><dd><p>True if successful, otherwise False.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="vyperdatum.transformer.Transformer.transform_vector">
+<span class="sig-name descname"><span class="pre">transform_vector</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/vyperdatum/transformer.html#Transformer.transform_vector"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vyperdatum.transformer.Transformer.transform_vector" title="Link to this definition"></a></dt>
+<dd><p>Transform the gdal-supported input vector file (<cite>input_file</cite>) and store the
+transformed file on the local disk (<cite>output_file</cite>).</p>
+<section id="id10">
+<h3>Raises<a class="headerlink" href="#id10" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>ValueError:</dt><dd><p>If <cite>.crs_input</cite> or <cite>.crs_output</cite> is not set.</p>
+</dd>
+<dt>FileNotFoundError:</dt><dd><p>If the input vector file is not found.</p>
+</dd>
+<dt>NotImplementedError:</dt><dd><p>If the input vector file is not supported by gdal.</p>
+</dd>
+</dl>
+</section>
+<section id="id11">
+<h3>Parameters<a class="headerlink" href="#id11" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>input_file: str</dt><dd><p>Path to the input vector file (gdal supported).</p>
+</dd>
+<dt>output_file: str</dt><dd><p>Path to the transformed vector file.</p>
+</dd>
+</dl>
+</section>
+<section id="id12">
+<h3>Returns<a class="headerlink" href="#id12" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>bool:</dt><dd><p>True if successful, otherwise False.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-vyperdatum">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-vyperdatum" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modules.html" class="btn btn-neutral float-left" title="vyperdatum" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="vyperdatum.utils.html" class="btn btn-neutral float-right" title="vyperdatum.utils package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Mohammad Ashkezari.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
