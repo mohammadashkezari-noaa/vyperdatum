@@ -359,7 +359,7 @@ def warp(input_file: str,
             ds_temp = None
             gdal.Unlink(mem_path)
 
-    if input_metadata["compression"]:
+    if input_metadata["compression"] and input_metadata["driver"].lower() == "gtiff":
         output_file_copy = str(output_file)+".tmp"
         os.rename(output_file, output_file_copy)
         raster_compress(output_file_copy, output_file,

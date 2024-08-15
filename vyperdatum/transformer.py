@@ -152,6 +152,7 @@ class Transformer():
                          apply_vertical: bool,
                          overview: bool = False,
                          warp_kwargs: Optional[dict] = None,
+                         final_step: bool = False,
                          ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
@@ -178,6 +179,8 @@ class Transformer():
             Path to the transformed raster file.
         overview: bool, default=True
             If True, overview bands are added to the output raster file (only GTiff support).
+        final_step: bool
+            True for the final step of a multi-step transformations, otherwise False.
 
         Returns
         --------

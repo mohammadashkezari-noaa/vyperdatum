@@ -140,5 +140,3 @@ def test_transform_raster(input_file: str, bench_file: str, func: str):
     # assert pp.CRS(raster_wkt(bench_file)).equals(pp.CRS(raster_wkt(xform_file))), "inconsistent crs."
     gen_ds, target_ds = None, None
     gen_band, target_band = None, None
-
-

@@ -2,9 +2,9 @@ import os
 import glob
 import pathlib
 from vyperdatum.transformer import Transformer
-from vyperdatum.utils.raster_utils import raster_metadata, raster_compress
+from vyperdatum.utils.raster_utils import raster_metadata
+from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate_raster
 from osgeo import gdal
-import pyproj as pp
 
 
 def transform_NC(input_file):
@@ -245,3 +245,17 @@ if __name__ == "__main__":
             transformed_file = transform_NC(input_file)
         elif os.path.basename(input_file).startswith("VA") or os.path.basename(input_file).startswith("MD"):
             transformed_file = transform_VA_MD(input_file)
+        vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_file=input_file,
+                                                            t_file=transformed_file,
+                                                            n_sample=20,
+                                                            sampling_band=1,
+                                                            region=None,
+                                                            pivot_h_crs="EPSG:6318",
+                                                            s_h_frame=None,
+                                                            s_v_frame=None,
+                                                            s_h_zone=None,
+                                                            t_h_frame=None,
+                                                            t_v_frame=None,
+                                                            t_h_zone=None
+                                                            )
+        print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')
