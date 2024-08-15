@@ -1,0 +1,4 @@
+sphinx==7.4.7
+sphinx_rtd_theme==2.0.0
+sphinx-notfound-page==1.0.4
+sphinx-autodocgen==1.3

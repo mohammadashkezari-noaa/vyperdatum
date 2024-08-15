@@ -9,7 +9,7 @@ copyright = '2024, Mohammad Ashkezari'
 author = 'Mohammad Ashkezari'
 release = '0.1.1'
 
-extensions = ['sphinx.ext.todo', 'sphinx.ext.viewcode', 'sphinx.ext.autodoc']
+extensions = ['sphinx.ext.todo', 'sphinx.ext.viewcode', 'sphinx.ext.autodoc', 'notfound.extension']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
