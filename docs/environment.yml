@@ -16,3 +16,5 @@ dependencies:
     - pandas==2.2.1
     - pyproj==3.6.1
     - tqdm==4.66.2
+    - colorama==0.4.6
+    - vyperdatum @ git+https://github.com/mohammadashkezari-noaa/vyperdatum@main

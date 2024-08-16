@@ -19,6 +19,7 @@ dependencies = [
     "pyproj",
     "pandas",
     "tqdm",
+    "colorama",
     "pydantic"
 ]
 classifiers = [
