@@ -106,6 +106,8 @@ def api_region_alias(region: str):
     api_region = "contiguous"
     if region.startswith("AK"):
         api_region = "ak"
+    if region.startswith("MD"):
+        api_region = "chesapeak_delaware"
     elif region.startswith("WA") or region.startswith("OR") or region.startswith("WC"):
         api_region = "westcoast"
     elif region.startswith("PRVI"):
