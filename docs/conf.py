@@ -1,13 +1,13 @@
 import os
 import sys
-from importlib.metadata import version
+from vyperdatum
 sys.path.insert(0, os.path.abspath(".."))
 sys.path.insert(0, os.path.abspath("../vyperdatum"))
 
 project = "Vyperdatum"
 copyright = "2024, Mohammad Ashkezari"
 author = "Mohammad Ashkezari"
-release = version("vyperdatum")
+release = vyperdatum.__version__
 
 extensions = ["sphinx.ext.todo", "sphinx.ext.viewcode", "sphinx.ext.autodoc", "notfound.extension"]
 
