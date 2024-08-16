@@ -6,7 +6,7 @@ conda:
 build:
   os: ubuntu-22.04
   tools:
-    python: "3.12"
+    python: "mambaforge-latest"
 
 sphinx:
   configuration: docs/conf.py
