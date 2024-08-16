@@ -458,3 +458,23 @@ def vdatum_cross_validate_raster(s_file: str,
         logger.exception(f"Exception in Vdatum deviation calculation:\n{e}")
         passed, cross_df = False, pd.DataFrame({})
     return passed, cross_df
+
+
+if __name__ == "__main__":
+    s_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\MD1902-TB-C\MD1902-TB-C_US4MD1EC_ellipsoidal_dem.tif"
+    t_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Manual\MD1902-TB-C\MD1902-TB-C_US4MD1EC_ellipsoidal_dem.tif"
+    vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_file=s_file,
+                                                        t_file=t_file,
+                                                        n_sample=20,
+                                                        sampling_band=1,
+                                                        region=None,
+                                                        pivot_h_crs="EPSG:6318",
+                                                        s_h_frame=None,
+                                                        s_v_frame=None,
+                                                        s_h_zone=None,
+                                                        t_h_frame=None,
+                                                        t_v_frame=None,
+                                                        t_h_zone=None
+                                                        )
+    print(f"success: {vdatum_cv}")
+    vdatum_df.to_csv("vdatum.csv", index=False)

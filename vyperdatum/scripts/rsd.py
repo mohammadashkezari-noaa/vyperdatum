@@ -238,13 +238,17 @@ def transform_VA_MD_short(input_file):
 
 
 if __name__ == "__main__":
-    files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\**\*.tif", recursive=True)
+    files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\**\MD*.tif", recursive=True)
     for i, input_file in enumerate(files):
         print(f"{i+1}/{len(files)}: {input_file}")
+        transformed_file = None
         if os.path.basename(input_file).startswith("NC"):
             transformed_file = transform_NC(input_file)
         elif os.path.basename(input_file).startswith("VA") or os.path.basename(input_file).startswith("MD"):
             transformed_file = transform_VA_MD(input_file)
+        if not transformed_file:
+            continue
+        raster_metadata(transformed_file, verbose=True)
         vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_file=input_file,
                                                             t_file=transformed_file,
                                                             n_sample=20,
