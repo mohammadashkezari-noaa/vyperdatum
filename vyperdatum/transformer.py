@@ -1,14 +1,17 @@
 import os
 import pathlib
 import logging
+from pprint import pformat
 from typing import Union, Optional
+from colorama import Fore, Style
 import pyproj as pp
-from pyproj.transformer import TransformerGroup
 from pyproj._transformer import AreaOfInterest
 import numpy as np
 from osgeo import gdal, osr, ogr
 from tqdm import tqdm
-from vyperdatum.utils import raster_utils
+from vyperdatum.utils import raster_utils, crs_utils
+from vyperdatum.utils.raster_utils import raster_metadata
+from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate_raster
 
 
 logger = logging.getLogger("root_logger")
@@ -21,16 +24,14 @@ class Transformer():
     def __init__(self,
                  crs_from: Union[pp.CRS, int, str],
                  crs_to: Union[pp.CRS, int, str],
-                 always_xy: bool = False,
-                 area_of_interest: Optional[AreaOfInterest] = None,
-                 authority: Optional[str] = None,
-                 accuracy: Optional[float] = None,
-                 allow_ballpark: Optional[bool] = False,
-                 force_over: bool = False,
-                 only_best: Optional[bool] = True
+                 steps: Optional[list[str]] = None
                  ) -> None:
         """
-        .. Some of the parameter descriptions adopted from pyproj :class:`Transformer`
+
+        Raises
+        ----------
+        ValueError
+            If the transformation steps cannot be validated.
 
         Parameters
         ----------
@@ -38,6 +39,50 @@ class Transformer():
             Projection of input data.
         crs_to: pyproj.crs.CRS or input used to create one
             Projection of output data.
+        steps: Optional[list[str]]
+            A list of CRSs in form of `authority:code`, representing the transformation steps
+            connecting the `crs_from` to `crs_to`. When None is passed, vyperdatum will attempt
+            to conduct a direct transformation from `crs_from` to `crs_to`, without any
+            intermediate CRSs.
+            Example: ['EPSG:6348', 'EPSG:6319', 'NOAA:8322', 'EPSG:6348+NOAA:5320']
+        """
+
+        if not isinstance(crs_from, pp.CRS):
+            crs_from = pp.CRS(crs_from)
+        if not isinstance(crs_to, pp.CRS):
+            crs_to = pp.CRS(crs_to)
+        self.crs_from = crs_from
+        self.crs_to = crs_to
+        self.steps = steps
+        if not self.steps:
+            self.steps = [crs_utils.auth_code(self.crs_from), crs_utils.auth_code(self.crs_to)]
+        if not crs_utils.validate_transform_steps(self.steps):
+            raise ValueError("Invalid transformation pipeline.")
+        return
+
+    def transform_points(self,
+                         x: Union[float, int, list, np.ndarray],
+                         y: Union[float, int, list, np.ndarray],
+                         z: Union[float, int, list, np.ndarray],
+                         always_xy: bool = False,
+                         area_of_interest: Optional[AreaOfInterest] = None,
+                         authority: Optional[str] = None,
+                         accuracy: Optional[float] = None,
+                         allow_ballpark: Optional[bool] = False,
+                         force_over: bool = False,
+                         only_best: Optional[bool] = True
+                         ):
+        """
+        Conduct point transformation between two coordinate reference systems.        
+
+        Parameters
+        ----------
+        x: numeric scalar or array
+           Input x coordinate(s).
+        y: numeric scalar or array
+           Input y coordinate(s).
+        z: numeric scalar or array, optional
+           Input z coordinate(s).
         always_xy: bool, default=False
             If true, the transform method will accept as input and return as output
             coordinates using the traditional GIS order, that is longitude, latitude
@@ -76,60 +121,22 @@ class Transformer():
             Requires PROJ 9.2+.
         """
 
-        if not isinstance(crs_from, pp.CRS):
-            crs_from = pp.CRS(crs_from)
-        if not isinstance(crs_to, pp.CRS):
-            crs_to = pp.CRS(crs_to)
-        self.crs_from = crs_from
-        self.crs_to = crs_to
-        self.transformer_group = TransformerGroup(crs_from=self.crs_from,
-                                                  crs_to=self.crs_to,
-                                                  allow_ballpark=allow_ballpark
-                                                  )
-        if len(self.transformer_group.transformers) > 0:
-            print(f"Found {len(self.transformer_group.transformers)} transformer(s) for"
-                  f"\n\tcrs_from: {self.crs_from.name}\n\tcrs_to: {self.crs_to.name}")
-        else:
-            err_msg = ("No transformers identified for the following transformation:"
-                       f"\n\tcrs_from: {self.crs_from.name}\n\tcrs_to: {self.crs_to.name}")
-            logger.exception(err_msg)
-            raise NotImplementedError(err_msg)
-        self.transformer = pp.Transformer.from_crs(crs_from=self.crs_from,
-                                                   crs_to=self.crs_to,
-                                                   always_xy=always_xy,
-                                                   area_of_interest=area_of_interest,
-                                                   authority=authority,
-                                                   accuracy=accuracy,
-                                                   allow_ballpark=allow_ballpark,
-                                                   force_over=force_over,
-                                                   only_best=only_best
-                                                   )
-        if not self.transformer.has_inverse:
-            logger.warning("No inverse transformer has defined!")
-
-    def transform_points(self,
-                         x: Union[float, int, list, np.ndarray],
-                         y: Union[float, int, list, np.ndarray],
-                         z: Union[float, int, list, np.ndarray],
-                         ):
-        """
-        Conduct point transformation between two coordinate reference systems.        
-
-        Parameters
-        ----------
-        x: numeric scalar or array
-           Input x coordinate(s).
-        y: numeric scalar or array
-           Input y coordinate(s).
-        z: numeric scalar or array, optional
-           Input z coordinate(s).
-        """
-
         try:
-            xt, yt, zt = None, None, None
-            xt, yt, zt = self.transformer.transform(x, y, z)
+            xt, yt, zt = x, y, z
+            for i in range(len(self.steps)-1):
+                xt, yt, zt = pp.Transformer.from_crs(crs_from=pp.CRS(self.steps[i]),
+                                                     crs_to=pp.CRS(self.steps[i+1]),
+                                                     always_xy=always_xy,
+                                                     area_of_interest=area_of_interest,
+                                                     authority=authority,
+                                                     accuracy=accuracy,
+                                                     allow_ballpark=allow_ballpark,
+                                                     force_over=force_over,
+                                                     only_best=only_best
+                                                     ).transform(xt, yt, zt)
         except Exception:
             logger.exception("Error while running the point transformation.")
+            return None, None, None
         return xt, yt, zt
 
     @staticmethod
@@ -146,22 +153,12 @@ class Transformer():
             + [".tif", ".tiff"]
             )
 
-    def transform_raster(self,
-                         input_file: str,
-                         output_file: str,
-                         apply_vertical: bool,
-                         overview: bool = False,
-                         warp_kwargs: Optional[dict] = None,
-                         final_step: bool = False,
-                         ) -> bool:
+    def _validate_input_file(self, input_file: str) -> bool:
         """
-        Transform the gdal-supported input rater file (`input_file`) and store the
-        transformed file on the local disk (`output_file`).
+        Check if the input file (`input_file`) exists and supported by GDAL.
 
         Raises
         -------
-        ValueError:
-            If `.crs_input` or `.crs_output` is not set.
         FileNotFoundError:
             If the input raster file is not found.
         NotImplementedError:
@@ -171,62 +168,165 @@ class Transformer():
         -----------
         input_file: str
             Path to the input raster file (gdal supported).
-        output_file: str
-            Path to the transformed raster file.
-        apply_vertical: bool
-            Apply GDAL vertical shift.
+
+        Returns
+        -----------
+        bool
+            True if passes all checks, otherwise False.
+        """
+        passed = False
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(f"The input raster file not found at {input_file}.")
+        if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
+            raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
+        passed = True
+        return passed
+
+    def transform_raster(self,
+                         input_file: str,
+                         output_file: str,
+                         overview: bool = False,
+                         warp_kwargs_horizontal: Optional[dict] = None,
+                         warp_kwargs_vertical: Optional[dict] = None
+                         ) -> bool:
+        """
+        Transform the gdal-supported input rater file (`input_file`) and store the
+        transformed file on the local disk (`output_file`).
+
+        Raises
+        -------
+        FileNotFoundError:
+            If the input raster file is not found.
+        NotImplementedError:
+            If the input file is not supported by gdal.
+
+        Parameters
+        -----------
+        input_file: str
+            Path to the input raster file (gdal supported).
         output_file: str
             Path to the transformed raster file.
         overview: bool, default=True
             If True, overview bands are added to the output raster file (only GTiff support).
-        final_step: bool
-            True for the final step of a multi-step transformations, otherwise False.
+        warp_kwargs_horizontal: Optional[dict], default=None
+            GDAL WarpOptions for horizontal transformation steps. If `None`, will be
+            automatically filled. If either source or target CRSs are dynamic,
+            CRS epoch will also get included.
+        warp_kwargs_vertical: Optional[dict], default=None
+            GDAL WarpOptions for vertical transformation steps. If `None`, will be
+            automatically filled. If either source or target CRSs are dynamic, CRS epoch
+            will also get included. Below is the default WarpOptions for vertical steps.
+            Note that the default WarpOptions assumes that only
+            band 1 of the raster file should be affected by the vertical shift (see
+            "srcBands" and "dstBands").
+            {
+             "outputType": gdal.gdalconst.GDT_Float32,
+             "srcBands": [1],
+             "dstBands": [1],
+             "warpOptions": ["APPLY_VERTICAL_SHIFT=YES",
+                             "SAMPLE_GRID=YES",
+                             "SAMPLE_STEPS=ALL"
+                             ],
+             "errorThreshold": 0,
+            }
 
         Returns
         --------
         bool:
             True if successful, otherwise False.
         """
-        if not (isinstance(self.crs_from, pp.CRS) & isinstance(self.crs_to, pp.CRS)):
-            raise ValueError(("The `.crs_input` and `.crs_output` attributes"
-                              "must be set with `pyproj.CRS` type values.")
-                             )
-        if not os.path.isfile(input_file):
-            raise FileNotFoundError(f"The input raster file not found at {input_file}.")
-
-        if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
-            raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
-
+        self._validate_input_file(input_file)
         try:
             success = False
-            input_metadata = raster_utils.raster_metadata(input_file)
-            raster_utils.pre_transformation_checks(source_meta=input_metadata)
-            raster_utils.warp(input_file=input_file,
-                              output_file=output_file,
-                              apply_vertical=apply_vertical,
-                              crs_from=self.crs_from,
-                              crs_to=self.crs_to,
-                              input_metadata=input_metadata,
-                              warp_kwargs=warp_kwargs
-                              )
-            output_metadata = raster_utils.raster_metadata(output_file)
-            raster_utils.post_transformation_checks(source_meta=input_metadata,
-                                                    target_meta=output_metadata,
-                                                    target_crs=self.crs_to,
-                                                    vertical_transform=apply_vertical
-                                                    )
-            # if apply_vertical and isinstance(warp_kwargs.get("srcBands"), list):
-            #     raster_utils.unchanged_to_nodata(src_raster_file=input_file,
-            #                                      xform_raster_file=output_file,
-            #                                      xform_band=warp_kwargs.get("srcBands")[0])
-
+            middle_files = []
+            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
+            for i in range(len(self.steps)-1):
+                logger.info(f"Step {i+1}/{len(self.steps)-1}:"
+                            f" {self.steps[i]} --> {self.steps[i+1]}")
+                s_crs, t_crs = pp.CRS(self.steps[i]), pp.CRS(self.steps[i+1])
+                i_file = input_file if len(middle_files) == 0 else middle_files[-1]
+                if i == len(self.steps)-2:
+                    o_file = output_file
+                else:
+                    pif = pathlib.Path(input_file)
+                    o_file = pif.with_stem(f"_{i}_{pif.stem}")
+                    middle_files.append(o_file)
+                v_shift = crs_utils.vertical_shift(s_crs, t_crs)
+                if v_shift:
+                    if warp_kwargs_vertical:
+                        warp_kwargs = warp_kwargs_vertical
+                    else:
+                        warp_kwargs = {
+                                       "outputType": gdal.gdalconst.GDT_Float32,
+                                       "srcBands": [1],
+                                       "dstBands": [1],
+                                       "warpOptions": ["APPLY_VERTICAL_SHIFT=YES",
+                                                       "SAMPLE_GRID=YES",
+                                                       "SAMPLE_STEPS=ALL"
+                                                       ],
+                                       "errorThreshold": 0,
+                                       }
+                        warp_kwargs = crs_utils.add_epoch_option(s_crs, t_crs, warp_kwargs)
+                else:
+                    if warp_kwargs_horizontal:
+                        warp_kwargs = warp_kwargs_horizontal
+                    else:
+                        warp_kwargs = {}
+                        warp_kwargs = crs_utils.add_epoch_option(s_crs, t_crs, warp_kwargs)
+                raster_utils.pre_transformation_checks(source_meta=raster_metadata(i_file),
+                                                       source_crs=s_crs)
+                raster_tf_block = {"step_id": i,
+                                   "input_file": i_file,
+                                   "output_file": o_file,
+                                   "crs_from": self.steps[i],
+                                   "crs_to": self.steps[i+1],
+                                   "vertical_shift": v_shift,
+                                   "warp_options": warp_kwargs,
+                                   "all_steps": self.steps
+                                   }
+                logger.info(f"Running Transformation step {i+1}/{len(self.steps)-1}:"
+                            f"\n{pformat(raster_tf_block, sort_dicts=False)}\n")
+                raster_utils.warp(input_file=i_file,
+                                  output_file=o_file,
+                                  apply_vertical=v_shift,
+                                  crs_from=s_crs,
+                                  crs_to=t_crs,
+                                  input_metadata=raster_metadata(i_file),
+                                  warp_kwargs=warp_kwargs
+                                  )
+                raster_utils.post_transformation_checks(source_meta=raster_metadata(i_file),
+                                                        target_meta=raster_metadata(o_file),
+                                                        target_crs=t_crs,
+                                                        vertical_transform=v_shift
+                                                        )
+            input_metadata = raster_metadata(input_file)
             if overview and input_metadata["driver"].lower() == "gtiff":
                 raster_utils.add_overview(raster_file=output_file,
                                           compression=input_metadata["compression"]
                                           )
                 # raster_utils.add_rat(output_file)
+            vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_file=input_file,
+                                                                t_file=output_file,
+                                                                n_sample=20,
+                                                                sampling_band=1,
+                                                                region=None,
+                                                                pivot_h_crs="EPSG:6318",
+                                                                s_h_frame=None,
+                                                                s_v_frame=None,
+                                                                s_h_zone=None,
+                                                                t_h_frame=None,
+                                                                t_v_frame=None,
+                                                                t_h_zone=None
+                                                                )
+            if not vdatum_cv:
+                csv_path = os.path.join(os.path.split(output_file)[0], "vdatum_check.csv")
+                vdatum_df.to_csv(csv_path, index=False)
+                logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
+                print(Style.RESET_ALL)
             success = True
         finally:
+            for mf in middle_files:
+                os.remove(mf)
             return success
 
     def transform_vector(self,
@@ -239,8 +339,6 @@ class Transformer():
 
         Raises
         -------
-        ValueError:
-            If `.crs_input` or `.crs_output` is not set.
         FileNotFoundError:
             If the input vector file is not found.
         NotImplementedError:
@@ -259,16 +357,8 @@ class Transformer():
             True if successful, otherwise False.
         """
         try:
-            if not (isinstance(self.crs_from, pp.CRS) & isinstance(self.crs_to, pp.CRS)):
-                raise ValueError("The `.crs_input` and `.crs_output` attributes"
-                                 "must be set with `pyproj.CRS` type values."
-                                 )
-            if not os.path.isfile(input_file):
-                raise FileNotFoundError(f"The input vector file not found at {input_file}.")
-
-            if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
-                raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
-
+            self._validate_input_file(input_file)            
+            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             pbar, success = None, False
             ds = gdal.OpenEx(input_file)
             driver = ogr.GetDriverByName(ds.GetDriver().ShortName)

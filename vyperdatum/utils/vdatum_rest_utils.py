@@ -386,7 +386,7 @@ def vdatum_cross_validate_raster(s_file: str,
     if not region:
         region = "contiguous"
         if len(source_meta["overlapping_regions"]) != 1:
-            logger.warning(">>>>> Warning <<<<< The input is not overlapping with a single region."
+            logger.warning("The input is not overlapping with a single region."
                            f" The overlapping regions: ({source_meta['overlapping_regions']})."
                            " The Vdatum API region will be set to 'contiguous'.")
         else:
@@ -448,37 +448,18 @@ def vdatum_cross_validate_raster(s_file: str,
             passed = False
         cross_df = cross_df.assign(deviation=cross_df["tgt_val"] - cross_df["vdatum_val"])
         deviation = cross_df["deviation"].abs().mean()
+        std = cross_df["deviation"].abs().std()
         if deviation > tolerance:
             logger.warning(f"{Fore.RED}The deviation between the transferred values produced by "
-                           f"Vyperdatum and Vdatum is {deviation:.2f} exceeding"
-                           f" the threshold {tolerance}.")
+                           f"Vyperdatum and Vdatum is {deviation:.2f} {chr(0x00b1)} {std:.2f} [m]"
+                           f" exceeding the threshold {tolerance} [m].")
             passed = False
         else:
             logger.warning(f"{Fore.GREEN}The deviation between the transferred values produced by "
-                           f"Vyperdatum and Vdatum is {deviation:.2f}, below"
-                           f" the threshold {tolerance}.")
+                           f"Vyperdatum and Vdatum is {deviation:.2f} {chr(0x00b1)} {std:.2f} [m],"
+                           f" below the threshold {tolerance} [m].")
         print(Style.RESET_ALL)
     except Exception as e:
         logger.exception(f"Exception in Vdatum deviation calculation:\n{e}")
         passed, cross_df = False, pd.DataFrame({})
     return passed, cross_df
-
-
-if __name__ == "__main__":
-    s_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\MD1902-TB-C\MD1902-TB-C_US4MD1EC_ellipsoidal_dem.tif"
-    t_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Manual\MD1902-TB-C\MD1902-TB-C_US4MD1EC_ellipsoidal_dem.tif"
-    vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_file=s_file,
-                                                        t_file=t_file,
-                                                        n_sample=20,
-                                                        sampling_band=1,
-                                                        region=None,
-                                                        pivot_h_crs="EPSG:6318",
-                                                        s_h_frame=None,
-                                                        s_v_frame=None,
-                                                        s_h_zone=None,
-                                                        t_h_frame=None,
-                                                        t_v_frame=None,
-                                                        t_h_zone=None
-                                                        )
-    print(f"success: {vdatum_cv}")
-    vdatum_df.to_csv("vdatum.csv", index=False)

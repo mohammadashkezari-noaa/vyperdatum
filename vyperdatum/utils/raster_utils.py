@@ -5,7 +5,7 @@ from osgeo import gdal
 import numpy as np
 from typing import Union, Optional
 import pyproj as pp
-from .spatial_utils import overlapping_regions, overlapping_extents
+from vyperdatum.utils.spatial_utils import overlapping_regions, overlapping_extents
 from vyperdatum.enums import VDATUM
 
 
@@ -252,7 +252,7 @@ def crs_to_code_auth(crs: pp.CRS) -> Optional[str]:
     Raises
     -------
     ValueError:
-        If either code of authority of the crs (or its sub_crs) can not be determined.
+        If either code or authority of the crs (or its sub_crs) can not be determined.
 
     Returns
     --------
@@ -369,7 +369,7 @@ def warp(input_file: str,
     return output_file
 
 
-def pre_transformation_checks(source_meta: dict):
+def pre_transformation_checks(source_meta: dict, source_crs: Union[pp.CRS, str]):
     """
     Run a number of sanity checks on the source raster file, before transformation.
     Warns if a check fails.
@@ -385,13 +385,22 @@ def pre_transformation_checks(source_meta: dict):
         Returns True if all checks pass, otherwise False.
     """
     passed = True
+    if ~isinstance(source_crs, pp.CRS):
+        source_crs = pp.CRS(source_crs)
+    source_auth = source_crs.to_authority()
+    raster_auth = pp.CRS(source_meta["wkt"]).to_authority()
+    if source_auth != raster_auth:
+        passed = False
+        logger.warning("The expected authority code/name of the "
+                       f"input raster file is {raster_auth}, but received {source_auth}"
+                       )
     if source_meta["bands"] != 3:
         passed = False
-        logger.warning(">>>>> Warning <<<<< Number of bands in the raster file: "
+        logger.warning("Number of bands in the raster file: "
                        f"{source_meta['bands']}. NBS rasters typically contain 3 bands")
     if len(source_meta["overlapping_regions"]) != 1:
         passed = False
-        logger.warning(">>>>> Warning <<<<< The raster is not overlapping with a single region. "
+        logger.warning("The raster is not overlapping with a single region. "
                        f"The overlapping regions: ({source_meta['overlapping_regions']}).")
     return passed
 
@@ -428,22 +437,22 @@ def post_transformation_checks(source_meta: dict,
     transformed_auth = pp.CRS(target_meta["wkt"]).to_authority()
     if target_auth != transformed_auth:
         passed = False
-        logger.warning(">>>>> Warning <<<<< The expected authority code/name of the "
+        logger.warning("The expected authority code/name of the "
                        f"transformed raster is {target_auth}, but received {transformed_auth}"
                        )
     if source_meta["bands"] != target_meta["bands"]:
         passed = False
-        logger.warning(">>>>> Warning <<<<< Number of bands in the source file "
+        logger.warning("Number of bands in the source file "
                        f"({source_meta['bands']}) doesn't match target ({target_meta['bands']}).")
     if vertical_transform:
         if source_meta["dimensions"] != target_meta["dimensions"]:
             passed = False
-            logger.warning(">>>>> Warning <<<<< The source file band dimensions "
+            logger.warning("The source file band dimensions "
                            f" ({source_meta['dimensions']}) don't match those of the "
                            f"transformed file ({target_meta['dimensions']}).")
         if source_meta["resolution"][0] != target_meta["resolution"][0] or source_meta["resolution"][1] != target_meta["resolution"][1]:
             passed = False
-            logger.warning(">>>>> Warning <<<<< The source file pixel size "
+            logger.warning("The source file pixel size "
                            f" ({source_meta['resolution']}) don't match those of the "
                            f"transformed file ({target_meta['resolution']}).")
     return passed
