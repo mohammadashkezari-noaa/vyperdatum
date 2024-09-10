@@ -102,7 +102,10 @@ class Pipeline():
             output CRS.
         """
         if pp.CRS(self.crs_to).is_compound:
+            _, s_v = self.split_crs(pp.CRS(self.crs_from))
             h, v = self.split_crs(pp.CRS(self.crs_to))
+            if s_v.upper() == v.upper():
+                return
             va, vc = v.split(":")
             df = DB().query("select concat(horiz_crs_auth_name, ':', horiz_crs_code) hac from"
                             f" compound_crs where vertical_crs_auth_name='{va}'"

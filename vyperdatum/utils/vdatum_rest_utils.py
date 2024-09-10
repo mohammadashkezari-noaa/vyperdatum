@@ -454,6 +454,10 @@ def vdatum_cross_validate_raster(s_file: str,
                            f"Vyperdatum and Vdatum is {deviation:.2f} {chr(0x00b1)} {std:.2f} [m]"
                            f" exceeding the threshold {tolerance} [m].")
             passed = False
+        elif deviation != deviation:
+            logger.warning(f"{Fore.RED}The deviation between the transferred values produced by "
+                           f"Vyperdatum and Vdatum is ambiguous (nan).")
+            passed = False
         else:
             logger.warning(f"{Fore.GREEN}The deviation between the transferred values produced by "
                            f"Vyperdatum and Vdatum is {deviation:.2f} {chr(0x00b1)} {std:.2f} [m],"

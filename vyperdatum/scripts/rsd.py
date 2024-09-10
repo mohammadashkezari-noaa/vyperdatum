@@ -239,13 +239,23 @@ def transform_VA_MD_short(input_file):
 
 
 if __name__ == "__main__":
-    files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\**\*.tif", recursive=True)
+    files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\**\MD*.tif", recursive=True)
     for i, input_file in enumerate(files):
         print(f"{i+1}/{len(files)}: {input_file}")
         transformed_file = None
         if os.path.basename(input_file).startswith("NC"):
-            # transformed_file = transform_NC(input_file)
-            pass
+            crs_from = "EPSG:6347"
+            crs_to = "EPSG:6347+NOAA:5374"
+            tf = Transformer(crs_from=crs_from,
+                             crs_to=crs_to,
+                             steps=["EPSG:6347", "EPSG:6319", "EPSG:6318+NOAA:5374", "EPSG:6347+NOAA:5374"]
+                            #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).linear_steps()
+                            #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).graph_steps()
+                             )
+            tf.transform_raster(input_file=input_file,
+                                output_file=input_file.replace("Original", "Manual"),
+                                overview=False,
+                                )
         elif os.path.basename(input_file).startswith("VA") or os.path.basename(input_file).startswith("MD"):
             crs_from = "EPSG:6347"
             crs_to = "EPSG:6347+NOAA:5200"

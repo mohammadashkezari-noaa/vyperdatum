@@ -3,9 +3,7 @@ import glob
 import pathlib
 from vyperdatum.transformer import Transformer
 from vyperdatum.utils.raster_utils import raster_metadata
-from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate_raster
-from osgeo import gdal
-import pyproj as pp
+from vyperdatum.pipeline import Pipeline
 
 
 def transform(input_file, home_dir):
@@ -112,28 +110,29 @@ def transform_MLLW(input_file, home_dir, in_wgs84_crs, out_nad83_crs):
 if __name__ == "__main__":
     # home_dir: path to the dir where the "Original" and "Manual" are stored
     home_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBA"
-    files = glob.glob(home_dir + r"\Original\**\*.bag", recursive=True)
+    files = glob.glob(home_dir + r"\Original\**\W*.bag", recursive=True)
     for i, input_file in enumerate(files):
         print(f"{i+1}/{len(files)}: {input_file}")
         raster_metadata(input_file, verbose=True)
         if os.path.basename(input_file).startswith("H12137"):
             transformed_file = transform_MLLW(input_file, home_dir, "EPSG:32619", "EPSG:26919")
         elif os.path.basename(input_file).startswith("W00656") or os.path.basename(input_file).startswith("D00158"):
-            transformed_file = transform_MLLW(input_file, home_dir, "EPSG:32617", "EPSG:26917")
+            # transformed_file = transform_MLLW(input_file, home_dir, "EPSG:32617", "EPSG:26917")
+            crs_from = "EPSG:32617+EPSG:5866"
+            crs_to = "EPSG:26917+EPSG:5866"
+            print(Pipeline(crs_from=crs_from, crs_to=crs_to).linear_steps())
+            # print(Pipeline(crs_from=crs_from, crs_to=crs_to).graph_steps())
+            # tf = Transformer(crs_from=crs_from,
+            #                  crs_to=crs_to,
+            #                  steps=["EPSG:32617+EPSG:5866", "EPSG:9755+EPSG:5866", "EPSG:6318+EPSG:5866", "EPSG:26917+EPSG:5866"]
+            #                 #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).linear_steps()
+            #                 #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).graph_steps()
+            #                  )
+            # tf.transform_raster(input_file=input_file,
+            #                     output_file=input_file.replace("Original", "Manual"),
+            #                     overview=False,
+            #                     )
         else:
             transformed_file = transform(input_file, home_dir)
-        raster_metadata(transformed_file, verbose=True)
-        vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_file=input_file,
-                                                            t_file=transformed_file,
-                                                            n_sample=20,
-                                                            sampling_band=1,
-                                                            region=None,
-                                                            pivot_h_crs="EPSG:6318",
-                                                            s_h_frame=None,
-                                                            s_v_frame=None,
-                                                            s_h_zone=None,
-                                                            t_h_frame=None,
-                                                            t_v_frame=None,
-                                                            t_h_zone=None
-                                                            )
+
         print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')

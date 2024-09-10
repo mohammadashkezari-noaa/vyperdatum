@@ -21,9 +21,9 @@ if __name__ == "__main__":
         print(f"{i+1}/{len(files)}: {input_file}")
         tf = Transformer(crs_from=crs_from,
                          crs_to=crs_to,
-                        #  steps=["EPSG:6346", "EPSG:6319", "EPSG:6318+NOAA:5224", "EPSG:6346+NOAA:5224"]
+                         steps=["EPSG:6346", "EPSG:6319", "EPSG:6318+NOAA:5224", "EPSG:6346+NOAA:5224"]
                         #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).linear_steps()
-                         steps=Pipeline(crs_from=crs_from, crs_to=crs_to).graph_steps()
+                        #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).graph_steps()
                          )
         tf.transform_raster(input_file=input_file,
                             output_file=input_file.replace("Original", "Manual"),

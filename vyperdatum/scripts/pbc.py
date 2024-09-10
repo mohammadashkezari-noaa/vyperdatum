@@ -21,19 +21,19 @@ if __name__ == "__main__":
                                 output_file=input_file.replace("Original", "Manual"),
                                 overview=False,
                                 )
-        # elif os.path.basename(input_file).startswith("ma"):
-        #     crs_from = "EPSG:26919"
-        #     crs_to = "EPSG:26919+NOAA:5320"
-        #     tf = Transformer(crs_from=crs_from,
-        #                      crs_to=crs_to,
-        #                      steps=["EPSG:26919", "EPSG:6319", "EPSG:6318+NOAA:5320", "EPSG:26919+NOAA:5320"]
-        #                     #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).linear_steps()
-        #                     #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).graph_steps()
-        #                      )
-        #     tf.transform_raster(input_file=input_file,
-        #                         output_file=input_file.replace("Original", "Manual"),
-        #                         overview=False,
-        #                         )
+        elif os.path.basename(input_file).startswith("ma"):
+            crs_from = "EPSG:26919"
+            crs_to = "EPSG:26919+NOAA:5320"
+            tf = Transformer(crs_from=crs_from,
+                             crs_to=crs_to,
+                             steps=["EPSG:26919", "EPSG:6319", "EPSG:6318+NOAA:5320", "EPSG:26919+NOAA:5320"]
+                            #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).linear_steps()
+                            #  steps=Pipeline(crs_from=crs_from, crs_to=crs_to).graph_steps()
+                             )
+            tf.transform_raster(input_file=input_file,
+                                output_file=input_file.replace("Original", "Manual"),
+                                overview=False,
+                                )
         elif os.path.basename(input_file).startswith("ct") or os.path.basename(input_file).startswith("rh"):
             crs_from = "EPSG:26919"
             crs_to = "EPSG:26919+NOAA:5434"
