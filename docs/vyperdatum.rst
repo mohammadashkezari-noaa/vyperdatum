@@ -28,6 +28,14 @@ vyperdatum.enums module
    :undoc-members:
    :show-inheritance:
 
+vyperdatum.pipeline module
+--------------------------
+
+.. automodule:: vyperdatum.pipeline
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 vyperdatum.transformer module
 -----------------------------
 

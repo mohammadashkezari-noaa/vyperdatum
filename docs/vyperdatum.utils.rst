@@ -4,6 +4,14 @@ vyperdatum.utils package
 Submodules
 ----------
 
+vyperdatum.utils.crs\_utils module
+----------------------------------
+
+.. automodule:: vyperdatum.utils.crs_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 vyperdatum.utils.npz module
 ---------------------------
 
