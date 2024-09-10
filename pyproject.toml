@@ -25,7 +25,7 @@ dependencies = [
     "networkx"
 ]
 classifiers = [
-  "Development Status :: Active",
+  "Development Status :: 3 - Alpha",
   "Programming Language :: Python"
 ]
 
