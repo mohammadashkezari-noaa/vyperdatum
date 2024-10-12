@@ -175,7 +175,7 @@ class Transformer():
             True if passes all checks, otherwise False.
         """
         passed = False
-        if not os.path.isfile(input_file):
+        if "vsimem" not in [s.lower() for s in input_file.split("/")] and not os.path.isfile(input_file):
             raise FileNotFoundError(f"The input raster file not found at {input_file}.")
         if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
             raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
@@ -186,6 +186,8 @@ class Transformer():
                          input_file: str,
                          output_file: str,
                          overview: bool = False,
+                         pre_post_checks: bool = True,
+                         vdatum_check: bool = True,
                          warp_kwargs_horizontal: Optional[dict] = None,
                          warp_kwargs_vertical: Optional[dict] = None
                          ) -> bool:
@@ -273,8 +275,9 @@ class Transformer():
                     else:
                         warp_kwargs = {}
                         warp_kwargs = crs_utils.add_epoch_option(s_crs, t_crs, warp_kwargs)
-                raster_utils.pre_transformation_checks(source_meta=raster_metadata(i_file),
-                                                       source_crs=s_crs)
+                if pre_post_checks:
+                    raster_utils.pre_transformation_checks(source_meta=raster_metadata(i_file),
+                                                           source_crs=s_crs)
                 raster_tf_block = {"step_id": i,
                                    "input_file": i_file,
                                    "output_file": o_file,
@@ -294,35 +297,37 @@ class Transformer():
                                   input_metadata=raster_metadata(i_file),
                                   warp_kwargs=warp_kwargs
                                   )
-                raster_utils.post_transformation_checks(source_meta=raster_metadata(i_file),
-                                                        target_meta=raster_metadata(o_file),
-                                                        target_crs=t_crs,
-                                                        vertical_transform=v_shift
-                                                        )
-            input_metadata = raster_metadata(input_file)
+                if pre_post_checks:
+                    raster_utils.post_transformation_checks(source_meta=raster_metadata(i_file),
+                                                            target_meta=raster_metadata(o_file),
+                                                            target_crs=t_crs,
+                                                            vertical_transform=v_shift
+                                                            )
             if overview and input_metadata["driver"].lower() == "gtiff":
+                input_metadata = raster_metadata(input_file)
                 raster_utils.add_overview(raster_file=output_file,
                                           compression=input_metadata["compression"]
                                           )
                 # raster_utils.add_rat(output_file)
-            vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_file=input_file,
-                                                                t_file=output_file,
-                                                                n_sample=20,
-                                                                sampling_band=1,
-                                                                region=None,
-                                                                pivot_h_crs="EPSG:6318",
-                                                                s_h_frame=None,
-                                                                s_v_frame=None,
-                                                                s_h_zone=None,
-                                                                t_h_frame=None,
-                                                                t_v_frame=None,
-                                                                t_h_zone=None
-                                                                )
-            if not vdatum_cv:
-                csv_path = os.path.join(os.path.split(output_file)[0], "vdatum_check.csv")
-                vdatum_df.to_csv(csv_path, index=False)
-                logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
-                print(Style.RESET_ALL)
+            if vdatum_check:
+                vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_file=input_file,
+                                                                    t_file=output_file,
+                                                                    n_sample=20,
+                                                                    sampling_band=1,
+                                                                    region=None,
+                                                                    pivot_h_crs="EPSG:6318",
+                                                                    s_h_frame=None,
+                                                                    s_v_frame=None,
+                                                                    s_h_zone=None,
+                                                                    t_h_frame=None,
+                                                                    t_v_frame=None,
+                                                                    t_h_zone=None
+                                                                    )
+                if not vdatum_cv:
+                    csv_path = os.path.join(os.path.split(output_file)[0], "vdatum_check.csv")
+                    vdatum_df.to_csv(csv_path, index=False)
+                    logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
+                    print(Style.RESET_ALL)
             success = True
         finally:
             for mf in middle_files:

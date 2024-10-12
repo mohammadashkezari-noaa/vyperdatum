@@ -22,7 +22,8 @@ dependencies = [
     "tqdm",
     "colorama",
     "pydantic",
-    "networkx"
+    "networkx",
+    "h5py"
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",

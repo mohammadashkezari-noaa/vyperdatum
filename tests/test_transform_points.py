@@ -1,6 +1,6 @@
 import pytest
 from vyperdatum.transformer import Transformer
-from vyperdatum.utils.npz import NPZ
+from vyperdatum.drivers.npz import NPZ
 
 
 def test_6349_to_6319():

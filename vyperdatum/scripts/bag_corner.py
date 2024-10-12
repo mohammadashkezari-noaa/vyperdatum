@@ -3,7 +3,7 @@ from io import BytesIO
 import h5py
 import numpy as np
 from lxml import etree
-from HSTB.drivers import bag as HSTB_bag
+import pyproj as pp
 
 
 def transform_w(p):
@@ -41,7 +41,7 @@ def corner_points(bag_fname: str):
     return root.find(f"{gml}coordinates").text
 
 
-def change_corner_points(bag_fname: str, new_points: str):
+def change_corner_points(bag_fname: str, new_points: str, wkt_h: str, wkt_v: str):
     """
     Update the metadata's corner points with new points.
     """
@@ -51,7 +51,10 @@ def change_corner_points(bag_fname: str, new_points: str):
     tree = etree.parse(buffer)
     root = tree.getroot()
     gml = ".//{" + root.nsmap['gml'] + "}"
+    gco = ".//{" + root.nsmap['gco'] + "}"
     root.find(f"{gml}coordinates").text = new_points
+    root.findall(f"{gco}CharacterString")[6].text = wkt_h
+    root.findall(f"{gco}CharacterString")[8].text = wkt_v
     # tree.write(xml_fname)
     # xml = etree.tostring(root, pretty_print=True).decode("ascii")
     xmet = etree.tostring(root).decode()
@@ -71,7 +74,7 @@ def update_W00656():
     new_w_corners = transform_w(w_p1) + " " + transform_w(w_p2)
     bag_fname = "W00656_MB_VR_MLLW_5of5.bag"
     print(corner_points(bag_fname=bag_fname))
-    change_corner_points(bag_fname=bag_fname, new_points=new_w_corners)
+    change_corner_points(bag_fname=bag_fname, new_points=new_w_corners, wkt_h=pp.CRS("EPSG:26917").to_wkt(), wkt_v=pp.CRS("EPSG:5866").to_wkt())
     print(corner_points(bag_fname=bag_fname))
     return
 
@@ -82,10 +85,27 @@ def update_H12137():
     new_h_corners = transform_h(h_p1) + " " + transform_h(h_p2)
     bag_fname = "H12137_MB_VR_MLLW_1of1.bag"
     print(corner_points(bag_fname=bag_fname))
-    change_corner_points(bag_fname=bag_fname, new_points=new_h_corners)
+    change_corner_points(bag_fname=bag_fname, new_points=new_h_corners, wkt_h=pp.CRS("EPSG:6348").to_wkt(), wkt_v=pp.CRS("EPSG:5866").to_wkt())
     print(corner_points(bag_fname=bag_fname))
     return
 
 
-# update_W00656()
-# update_H12137()
+update_W00656()
+update_H12137()
+
+
+
+# bag_fname = "W00656_MB_VR_MLLW_5of5.bag"
+# bag = h5py.File(bag_fname)
+# meta = bag["BAG_root/metadata"]
+# buffer = BytesIO(meta[()])
+# tree = etree.parse(buffer)
+# root = tree.getroot()
+# gco = ".//{" + root.nsmap['gco'] + "}"
+# css = root.findall(f"{gco}CharacterString")
+# print(len(css))
+# for i, cs in enumerate(css):
+#     print(i)
+#     print(cs.text[:5])
+#     print("///////")
+# bag.close()

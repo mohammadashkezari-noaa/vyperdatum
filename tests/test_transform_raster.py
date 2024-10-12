@@ -5,7 +5,7 @@ import numpy as np
 import pyproj as pp
 import pytest
 from vyperdatum.transformer import Transformer
-from vyperdatum.utils.npz import NPZ
+from vyperdatum.drivers.npz import NPZ
 
 
 def raster_wkt(raster_file: str):

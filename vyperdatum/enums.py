@@ -40,3 +40,8 @@ class VDATUM(RootEnum):
                 "WGS84_G1150", "ITRF2000", "IGS00", "IGb00", "ITRF96", "WGS84_G873", "ITRF94",
                 "ITRF93", "ITRF92", "SIOMIT92", "WGS84_G730", "ITRF91", "ITRF90", "ITRF89",
                 "ITRF88", "WGS84_TRANSIT", "WGS84_G1762", "WGS84_G2139"]
+
+
+class VRBAG(RootEnum):
+    NDV_REF = 1000000
+    NO_REF_INDEX = 0xffffffff
