@@ -245,6 +245,32 @@ def raster_compress(raster_file_path: str,
     return
 
 
+def preserve_raster_size(input_file: str,
+                         output_file: str
+                         ):
+    """
+    Resize the `output_file` raster dimensions to those of the input `input_file`.
+
+    Parameters
+    ----------
+    input_file: str
+        absolute path to the input raster file.
+    output_file: str
+        absolute path to the compressed output raster file.
+    """
+    ds_in = gdal.Open(input_file)
+    ds_out = gdal.Open(output_file)
+    w_in, h_in = ds_in.RasterXSize, ds_in.RasterYSize
+    w_out, h_out = ds_out.RasterXSize, ds_out.RasterYSize
+    ds_in, ds_out = None, None
+    if w_in != w_out or h_in != h_out:
+        output_file_copy = str(output_file)+".tmp"
+        os.rename(output_file, output_file_copy)
+        gdal.Translate(output_file, output_file_copy, width=w_in, height=h_in)
+        os.remove(output_file_copy)
+    return
+
+
 def crs_to_code_auth(crs: pp.CRS) -> Optional[str]:
     """
     Return CRS string representation in form of code:authority
@@ -359,6 +385,8 @@ def warp(input_file: str,
             ds_temp = None
             gdal.Unlink(mem_path)
 
+    # preserve_raster_size(input_file=input_file, output_file=output_file)
+
     if input_metadata["compression"] and input_metadata["driver"].lower() == "gtiff":
         output_file_copy = str(output_file)+".tmp"
         os.rename(output_file, output_file_copy)
@@ -366,6 +394,7 @@ def warp(input_file: str,
                         input_metadata["driver"], input_metadata['compression']
                         )
         os.remove(output_file_copy)
+
     return output_file
 
 
@@ -444,6 +473,7 @@ def post_transformation_checks(source_meta: dict,
         passed = False
         logger.warning("Number of bands in the source file "
                        f"({source_meta['bands']}) doesn't match target ({target_meta['bands']}).")
+
     if vertical_transform:
         if source_meta["dimensions"] != target_meta["dimensions"]:
             passed = False

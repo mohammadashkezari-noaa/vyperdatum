@@ -1,7 +1,7 @@
 import os, time
-from glob import glob
+import logging
 import shutil
-from typing import Union
+from typing import Union, Optional
 import concurrent.futures
 import numpy as np
 import pyproj as pp
@@ -11,6 +11,9 @@ from osgeo import gdal
 from vyperdatum.transformer import Transformer
 from vyperdatum.utils.raster_utils import raster_metadata
 from vyperdatum.enums import VRBAG as vrb_enum
+
+logger = logging.getLogger("root_logger")
+gdal.UseExceptions()
 
 
 def index_to_xy(i: int, j: int, geot: tuple, x_offset, y_offset):
@@ -38,115 +41,225 @@ def index_to_xy(i: int, j: int, geot: tuple, x_offset, y_offset):
     return x, y
 
 
-def get_subgrids(fname: str) -> tuple[list[float], list[float], list[float], list[float]]:
+def base_grid_point_transform(fname: str,
+                              tf: Transformer,
+                              nodata_value
+                              ) -> np.ndarray:
     """
-    Identify the subgrids within the vrbag and return the starting
-    index and coordinates of the points within each subgrid.
+    Transform the low-resolution grid and return the transformed values.
 
     Parameters
     ----------
     fname: str
         Absolute path to the vrbag file.
+    tf: vyperdatum.transformer.Transformer
+        Instance of the transformer class.
+    nodata_value: float
+        No_Data_Value used in the vrbag elevation layer.
 
     Returns
     ----------
-    list[float], list[float], list[float], list[float]
-        Starting index of each subgrid.
+    np.ndarray
+        The transformed vrbag elevation layer.
+    """
+    ds_gdal = gdal.Open(fname)
+    geot = ds_gdal.GetGeoTransform()
+    bag = h5py.File(fname)
+    root = bag["BAG_root"]
+    vr_elev = np.array(root["elevation"])
+    vr_elev_shape = vr_elev.shape
+    x, y, z = np.array([]), np.array([]), np.array([])
+    for i in range(vr_elev_shape[0]):
+        for j in range(vr_elev_shape[1]):
+            _x, _y = index_to_xy(i, j, geot, x_offset=0, y_offset=0)
+            x = np.append(x, [_x])
+            y = np.append(y, [_y])
+            z = np.append(z, vr_elev[i, j])
+
+    _, _, zz = tf.transform_points(x, y, z)
+    zz = np.where(z == nodata_value, z, zz)
+    zz = zz.reshape(vr_elev_shape)
+
+    ds_gdal = None
+    bag.close()
+    return zz
+
+
+def update_vr_elevation(fname: str,
+                        arr: np.ndarray) -> None:
+    """
+    Update the `elevation` layer in the vrbag file with the `arr` values.
+
+    Parameters
+    ----------
+    fname : str
+        Absolute path to the vrbag file.
+    arr: np.ndarray
+        numpy array representing the elevation values to be updated.
+
+    Returns
+    ----------
+    None
+    """
+
+    bag = h5py.File(fname, "r+")
+    root = bag.require_group("/BAG_root")
+    del root["elevation"]
+    root.create_dataset("elevation",
+                        maxshape=(None, None),
+                        data=np.array(arr, dtype=np.float32),
+                        fillvalue=vrb_enum.NDV_REF.value,
+                        compression="gzip",
+                        compression_opts=9
+                        )
+    arr = np.where(arr == vrb_enum.NDV_REF.value, np.nan, arr)
+    root["elevation"].attrs.create("Maximum Elevation Value", np.nanmax(arr), dtype=np.float32)
+    root["elevation"].attrs.create("Minimum Elevation Value", np.nanmin(arr), dtype=np.float32)
+    bag.close()
+    return
+
+
+def get_subgrid_points(fname: str, i: int, j: int) -> tuple[list[int], list[float],
+                                                            list[float], list[float]]:
+    """
+    Return the starting index and coordinates of the points of subgrid i, j.
+
+    Parameters
+    ----------
+    fname: str
+        Absolute path to the vrbag file.
+    i: int
+        First index of the subgrid.
+    j: int
+        Second index of the subgrid.
+
+    Returns
+    ----------
+    list[int], list[float], list[float], list[float]
+        Starting index of subgrid.
         x, y, z coordinates of the subgrid points.
     """
     ds_gdal = gdal.Open(fname)
     geot = ds_gdal.GetGeoTransform()
-    bag = h5py.File(fname)["BAG_root"]
-    vr_meta = bag["varres_metadata"]
-    vr_ref = bag["varres_refinements"][0]
-    index, x, y, z = [], [], [], []
-    for i in tqdm(range(vr_meta.shape[0])):
-        for j in range(vr_meta.shape[1]):
-            start = vr_meta[i, j][0]
-            if start == 0xffffffff:
-                continue
-            dim_x, dim_y = vr_meta[i, j][1], vr_meta[i, j][2]
-            res_x, res_y = vr_meta[i, j][3], vr_meta[i, j][4]
-            sw_corner_x, sw_corner_y = vr_meta[i, j][5], vr_meta[i, j][6]
-            cell_x, cell_y = index_to_xy(i, j, geot, x_offset=sw_corner_x, y_offset=sw_corner_y)
-            index.append(start)
-            x.append(np.array([cell_x + (i - i // dim_x) * res_x for i in range(dim_x*dim_y)]))
-            y.append(np.array([cell_y + (i // dim_x) * res_y for i in range(dim_x*dim_y)]))
-            z.append(np.array([vr[0] for vr in vr_ref[start:start+(dim_x*dim_y)]]))
+    bag = h5py.File(fname)
+    root = bag["BAG_root"]
+    vr_meta = root["varres_metadata"]
+    vr_ref = root["varres_refinements"][0]
+
+    start = vr_meta[i, j][0]
+    dim_x, dim_y = vr_meta[i, j][1], vr_meta[i, j][2]
+    res_x, res_y = vr_meta[i, j][3], vr_meta[i, j][4]
+    sw_corner_x, sw_corner_y = vr_meta[i, j][5], vr_meta[i, j][6]
+    cell_x, cell_y = index_to_xy(i, j, geot, x_offset=sw_corner_x, y_offset=sw_corner_y)
+
+    x = np.array([cell_x + (i - i // dim_x) * res_x for i in range(dim_x*dim_y)])
+    y = np.array([cell_y + (i // dim_x) * res_y for i in range(dim_x*dim_y)])
+    z = np.array([vr[0] for vr in vr_ref[start:start+(dim_x*dim_y)]])
+    
     ds_gdal = None
-    return index, x, y, z
+    bag.close()
+    return start, x, y, z
 
 
-def subgrid_point_transform(x: Union[list[float], np.ndarray],
-                            y: Union[list[float], np.ndarray],
-                            z: Union[list[float], np.ndarray],
-                            crs_from: str,
-                            crs_to: str,
-                            steps: list[str]
-                            ) -> tuple[list[float], list[float], list[float]]:
+def single_subgrid_point_transform(fname: str,
+                                   i: int,
+                                   j: int,
+                                   tf: Transformer,
+                                   nodata_value
+                                   ) -> tuple[Optional[int], Optional[np.ndarray]]:
     """
     Apply point transformation of subgrid points.
 
     Parameters
     ----------
-    x: list[float] or np.ndarray
-        Point's x-coordinate.
-    y: list[float] or np.ndarray
-        Point's y-coordinate.
-    z: list[float] or np.ndarray
-        Point's z-coordinate.
-    crs_from: str
-        Source CRS, in authority:code format.
-    crs_to: str
-        Target CRS, in authority:code format.
-    steps: list[str]
-        List of required intermediate CRSs to apply the
-        transformation (all in authority:code format).
+    fname: str
+        Absolute path to the vrbag file.
+    i: int
+        The first index of the subgrid.
+    j: int
+        The second index of the subgrid.
+    tf: vyperdatum.transformer.Transformer
+        Instance of the transformer class.
+    nodata_value: float
+        No_Data_Value used for the generated GeoTiff.
 
     Returns
     ----------
-    list[float], list[float], list[float]
-        x, y, z transformed coordinates of the subgrid points.
+    tuple[Optional[int], np.ndarray]
+        The starting index of the subgrid in the varres_refinements layer.
+        The transformed subgrid depth values in form of a 1-d array.
     """
-
-    assert len(x) == len(y) == len(z)
-    tf = Transformer(crs_from=crs_from,
-                     crs_to=crs_to,
-                     steps=steps
-                     )
-    xt, yt, zt = [], [], []
-    for i in tqdm(range(len(x))):
-        xx, yy, zz = tf.transform_points(x[i], y[i], z[i])
-        xx = np.where(z[i] == vrb_enum.NDV_REF.value, x[i], xx)
-        yy = np.where(z[i] == vrb_enum.NDV_REF.value, y[i], yy)
-        zz = np.where(z[i] == vrb_enum.NDV_REF.value, z[i], zz)
-        xt.append(xx)
-        yt.append(yy)
-        zt.append(zz)
-    return xt, yt, zt
-
-
-def single_raster_transform(tf: Transformer,
-                            input_file: str,
-                            output_file: str
-                            ):
-
     try:
-        tf.transform_raster(input_file=input_file, output_file=output_file,
-                            pre_post_checks=False, vdatum_check=False)
-        res = output_file
-    except:
-        res = None
-    return res
+        start, x, y, z = get_subgrid_points(fname, i, j)
+        _, _, zz = tf.transform_points(x, y, z)
+        zz = np.where(z == nodata_value, z, zz)
+    except Exception as e:
+        logger.exception(f"Unexpected exception in single_subgrid_point_transform for subgrid {i}, {j}: {e}")
+
+        f = open("error.txt", "a")
+        f.write(f"Unexpected exception in single_subgrid_point_transform for subgrid {i}, {j}: {e}\n")
+        f.close()
+
+        start, zz = None, None
+
+    return start, zz
 
 
-def subgrid_transform(fname: str,
-                      rasters_dir: str,
-                      i: int,
-                      j: int,
-                      tf: Transformer,
-                      nodata_value
-                      ):
+def subgrid_point_transform(fname: str,
+                            tf: Transformer,
+                            ) -> tuple[list[int], list[float]]:
+    """
+    Identify the subgrids within the vrbag and return the starting
+    index and the depth values within each subgrid.
+
+    Parameters
+    ----------
+    fname: str
+        Absolute path to the vrbag file.
+    tf: vyperdatum.transformer.Transformer
+        Instance of the transformer class.
+
+    Returns
+    ----------
+    list[int], list[float]
+        Starting index of each subgrid.
+        Transformed subgrid depth values.
+    """
+    bag = h5py.File(fname)
+    root = bag["BAG_root"]
+    vr_meta = root["varres_metadata"]
+    start_indices, transformed_refs, ii, jj = [], [], [], []    
+    for i in tqdm(range(vr_meta.shape[0]), desc="Search for refined subgrids"):
+        for j in range(vr_meta.shape[1]):
+            start = vr_meta[i, j][0]
+            if start == vrb_enum.NO_REF_INDEX.value:
+                continue
+            # if not(i==11 and j==112):
+            #     continue
+            ii.append(i)
+            jj.append(j)
+    bag.close()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futureObjs = executor.map(single_subgrid_point_transform,
+                                  [fname] * len(ii),
+                                  ii, jj,
+                                  [tf] * len(ii),
+                                  [vrb_enum.NDV_REF.value] * len(ii)
+                                  )
+        for i, fo in enumerate(tqdm(futureObjs, total=len(ii))):
+            if fo[0] is not None:
+                start_indices.append(fo[0])
+                transformed_refs.append(fo[1])
+    return start_indices, transformed_refs
+
+
+def single_subgrid_rsater_transform(fname: str,
+                                    rasters_dir: str,
+                                    i: int,
+                                    j: int,
+                                    tf: Transformer,
+                                    nodata_value
+                                    ) -> tuple[Optional[int], Optional[np.ndarray]]:
     """
     Extract a subgrid from from the vrbag file, convert to GeoTiff, and apply transformation.
 
@@ -171,9 +284,9 @@ def subgrid_transform(fname: str,
         The transformed subgrid in form of a 1-d array.
     """
     try:
-        bagm = raster_metadata(fname)
-        geot = bagm["geo_transform"]
-        wkt = bagm["wkt"]
+        bm = raster_metadata(fname)
+        geot = bm["geo_transform"]
+        wkt = bm["wkt"]
 
         bag = h5py.File(fname)
         root = bag["BAG_root"]
@@ -185,8 +298,8 @@ def subgrid_transform(fname: str,
         res_x, res_y = vr_meta[i, j][3], vr_meta[i, j][4]
         sw_corner_x, sw_corner_y = vr_meta[i, j][5], vr_meta[i, j][6]
 
-        sub_x_min = sw_corner_x + j * geot[1]
-        sub_y_min = sw_corner_y + i * abs(geot[5])
+        sub_x_min = geot[0] + j * geot[1] + sw_corner_x
+        sub_y_min = geot[3] + i * geot[5] + sw_corner_y
         sub_extent = [sub_x_min, sub_y_min, sub_x_min + geot[1], sub_y_min + abs(geot[5])]
         sub_geot = (sub_extent[0], res_x, 0, sub_extent[3], 0, -res_y)
         sub_grid = vr_ref[start:start+(dim_x*dim_y)]["depth"].reshape((dim_y, dim_x))
@@ -215,17 +328,28 @@ def subgrid_transform(fname: str,
         bag.close()
         gdal.Unlink(sub_raster_fname)
         gdal.Unlink(transformed_sub_fname)
-    except Exception as e:
-        print(e)
+
+        if len(transformed_refs) != dim_y * dim_x:
+            msg = f"Transferred length for sub array {i}, {j} was expected to be {dim_y * dim_x} but is {len(transformed_refs)}\n"
+            logger.error(msg)
+            f = open("error.txt", "a")
+            f.write(msg)
+            f.close()
+
+    except Exception as e:        
+        logger.exception(f"Unexpected exception in single_subgrid_rsater_transform: {e}")
+
+        f = open("error.txt", "a")
+        f.write(f"Unexpected exception in single_subgrid_rsater_transform for subgrid {i}, {j}: {e}\n")
+        f.close()
+
         start, transformed_refs = None, None
     return start, transformed_refs
 
 
 def subgrid_raster_transform(fname: str,
                              rasters_dir: str,
-                             crs_from: str,
-                             crs_to: str,
-                             steps: list[str]
+                             tf: Transformer,
                              ) -> tuple[list[int], list[float]]:
     """
     Identify the subgrids within the vrbag and return the starting
@@ -233,16 +357,12 @@ def subgrid_raster_transform(fname: str,
 
     Parameters
     ----------
+    fname : str
+        Absolute path to the vrbag file.
     rasters_dir : str
         Absolute path to the directory where the output TIFF files will be stored.
-    crs_from: str
-        Projection of input data in `authority:code` format.
-    crs_to: str
-        Projection of output data in `authority:code` format.
-    steps: list[str]
-        A list of CRSs in form of `authority:code`, representing the transformation steps
-        connecting the `crs_from` to `crs_to`.
-        Example: ['EPSG:6348', 'EPSG:6319', 'NOAA:8322', 'EPSG:6348+NOAA:5320']
+    tf: vyperdatum.transformer.Transformer
+        Instance of the transformer class.
 
     Returns
     ----------
@@ -259,17 +379,22 @@ def subgrid_raster_transform(fname: str,
     root = bag["BAG_root"]
     vr_meta = root["varres_metadata"]
     start_indices, transformed_refs, ii, jj = [], [], [], []
-    tf = Transformer(crs_from=crs_from, crs_to=crs_to, steps=steps)
     for i in tqdm(range(vr_meta.shape[0]), desc="Making subgrid rasters"):
         for j in range(vr_meta.shape[1]):
             start = vr_meta[i, j][0]
             if start == vrb_enum.NO_REF_INDEX.value:
                 continue
+
+
+            # if not(i==11 and j==112):
+            #     continue        
+
+
             ii.append(i)
             jj.append(j)
     bag.close()
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        futureObjs = executor.map(subgrid_transform,
+        futureObjs = executor.map(single_subgrid_rsater_transform,
                                   [fname] * len(ii),
                                   [rasters_dir] * len(ii),
                                   ii, jj,
@@ -285,7 +410,8 @@ def subgrid_raster_transform(fname: str,
 
 def update_vr_refinements(fname: str,
                           index: list[int],
-                          arr: list[np.ndarray]) -> None:
+                          arr: list[np.ndarray],
+                          tf: Transformer) -> None:
     """
     Update the `varres_refinements` layer in the vrbag file with the
     `arr` values starting form `index` location in the `varres_refinements`.
@@ -298,6 +424,8 @@ def update_vr_refinements(fname: str,
         A list of starting index where the refinements get updated.
     arr: list[np.ndarray]
         List of numpy array representing the refinements values to be updated.
+    tf: vyperdatum.transformer.Transformer
+        Instance of the transformer class.
 
     Returns
     ----------
@@ -319,43 +447,41 @@ def update_vr_refinements(fname: str,
                         compression="gzip",
                         compression_opts=9
                         )
+    darr = np.array(vr_ref[0][:]["depth"])
+    uarr = np.array(vr_ref[0][:]["depth_uncrt"])
+    darr = np.where(darr == vrb_enum.NDV_REF.value, np.nan, darr)
+    uarr = np.where(uarr == vrb_enum.NDV_REF.value, np.nan, uarr)
+    root["varres_refinements"].attrs.create("max_depth", np.nanmax(darr), dtype=np.float32)
+    root["varres_refinements"].attrs.create("max_uncrt", np.nanmax(uarr), dtype=np.float32)
+    root["varres_refinements"].attrs.create("min_depth", np.nanmin(darr), dtype=np.float32)
+    root["varres_refinements"].attrs.create("min_uncrt", np.nanmin(uarr), dtype=np.float32)
     bag.close()
+    # update the base grid and its attributes
+    zt = base_grid_point_transform(fname=fname, tf=tf, nodata_value=vrb_enum.NDV_REF.value)
+    update_vr_elevation(fname=fname, arr=zt)
     return
 
 
 if __name__ == "__main__":
     fname = r"C:\Users\mohammad.ashkezari\Desktop\original_vrbag\W00656_MB_VR_MLLW_5of5.bag"
-
     ############ raster transformation ##############
     tic = time.time()
     crs_from = "EPSG:32617+EPSG:5866"
     crs_to = "EPSG:26917+EPSG:5866"
+    # steps=["EPSG:32617+EPSG:5866", "EPSG:9755+EPSG:5866", "EPSG:6318+EPSG:5866", "EPSG:26917+EPSG:5866"]
     steps = ["EPSG:32617+EPSG:5866", "EPSG:9755", "EPSG:6318", "EPSG:26917+EPSG:5866"]
-    index, zt = subgrid_raster_transform(fname=fname,
-                                        #  rasters_dir="./sub_grids/",
-                                         rasters_dir="/vsimem/sub_grids/",
-                                         crs_from=crs_from,
-                                         crs_to=crs_to,
-                                         steps=steps
-                                         )
-    print("total time: ", time.time() - tic)
-
-    update_vr_refinements(fname=fname,
-                          index=index,
-                          arr=zt
-                          )
-
-    # # ############ point transformation ##############
-    # index, x, y, z = get_subgrids(fname=fname)
-    # # limit data for test
-    # index, x, y, z = index[:2], x[:2], y[:2], z[:2]
-    # xt, yt, zt = subgrid_point_transform(x, y, z,
-    #                                      crs_from="EPSG:32617+EPSG:5866",
-    #                                      crs_to="EPSG:26917+EPSG:5866",
-    #                                      # steps=["EPSG:32617+EPSG:5866", "EPSG:9755+EPSG:5866", "EPSG:6318+EPSG:5866", "EPSG:26917+EPSG:5866"]
-    #                                      steps=["EPSG:32617+EPSG:5866", "EPSG:9755", "EPSG:6318", "EPSG:26917+EPSG:5866"]
+    tf = Transformer(crs_from=crs_from, crs_to=crs_to, steps=steps)
+    ############ raster transformation ##############
+    # index, zt = subgrid_raster_transform(fname=fname,
+    #                                      rasters_dir="./sub_grids/",
+    #                                     #  rasters_dir="/vsimem/sub_grids/",
+    #                                      tf=tf
     #                                      )
-    # update_vr_refinements(fname=fname,
-    #                       index=index,
-    #                       arr=zt
-    #                       )
+
+
+    ############ point transformation ##############
+    index, zt = subgrid_point_transform(fname, tf=tf)
+
+
+    print("total time: ", time.time() - tic)
+    update_vr_refinements(fname=fname, index=index, arr=zt, tf=tf)

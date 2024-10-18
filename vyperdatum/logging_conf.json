@@ -35,7 +35,7 @@
       "handlers": [
         "console"
       ],
-      "level": "INFO"
+      "level": "WARN"
     }
   },
   "version": 1
