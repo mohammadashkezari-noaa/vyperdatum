@@ -12,14 +12,6 @@ vyperdatum.utils.crs\_utils module
    :undoc-members:
    :show-inheritance:
 
-vyperdatum.utils.npz module
----------------------------
-
-.. automodule:: vyperdatum.utils.npz
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 vyperdatum.utils.raster\_utils module
 -------------------------------------
 

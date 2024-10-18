@@ -7,6 +7,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   vyperdatum.drivers
    vyperdatum.utils
 
 Submodules
