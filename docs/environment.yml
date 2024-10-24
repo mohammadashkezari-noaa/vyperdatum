@@ -18,6 +18,6 @@ dependencies:
     - tqdm==4.66.2
     - colorama==0.4.6
     - networkx==3.3
-    - vyperdatum
+    - vyperdatum @ git+https://github.com/mohammadashkezari-noaa/vyperdatum@main
     - h5py
-    - laspy
+    - laspy    
