@@ -1,19 +1,51 @@
-import os, time
+
+# https://bag.readthedocs.io/en/master/howto-guide/index.html
+# https://bag.readthedocs.io/en/master/fsd/FSD-Extension-VRGrid.html#xml-metadata-extensions-interpretation
+# https://salishsea-meopar-tools.readthedocs.io/en/latest/bathymetry/ExploringBagFiles.html
+# https://github.com/OpenNavigationSurface/BAG
+# https://docs.h5py.org/en/stable/quick.html
+
+
+import os
+import time
 import logging
 import shutil
-from typing import Union, Optional
+from typing import Optional
 import concurrent.futures
 import numpy as np
-import pyproj as pp
 import h5py
-from tqdm import tqdm
+from io import BytesIO
+from lxml import etree
+from tqdm.auto import tqdm
 from osgeo import gdal
-from vyperdatum.transformer import Transformer
 from vyperdatum.utils.raster_utils import raster_metadata
 from vyperdatum.enums import VRBAG as vrb_enum
 
+
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
+
+
+def is_vr(fname: str) -> bool:
+    """
+    Return True if fname points to a variable resolution BAG file.
+
+    Parameters
+    ----------
+    fname: str
+        Absolute path to the bag file.
+
+    Returns
+    ----------
+    bool
+    """
+    try:
+        bag = h5py.File(fname)
+        vr = "varres_refinements" in list(bag["BAG_root"].keys())
+        bag.close()
+    except:
+        vr = False
+    return vr
 
 
 def index_to_xy(i: int, j: int, geot: tuple, x_offset, y_offset):
@@ -42,7 +74,7 @@ def index_to_xy(i: int, j: int, geot: tuple, x_offset, y_offset):
 
 
 def base_grid_point_transform(fname: str,
-                              tf: Transformer,
+                              tf,
                               nodata_value
                               ) -> np.ndarray:
     """
@@ -164,7 +196,7 @@ def get_subgrid_points(fname: str, i: int, j: int) -> tuple[list[int], list[floa
 def single_subgrid_point_transform(fname: str,
                                    i: int,
                                    j: int,
-                                   tf: Transformer,
+                                   tf,
                                    nodata_value
                                    ) -> tuple[Optional[int], Optional[np.ndarray]]:
     """
@@ -206,7 +238,7 @@ def single_subgrid_point_transform(fname: str,
 
 
 def subgrid_point_transform(fname: str,
-                            tf: Transformer,
+                            tf,
                             ) -> tuple[list[int], list[float]]:
     """
     Identify the subgrids within the vrbag and return the starting
@@ -234,7 +266,7 @@ def subgrid_point_transform(fname: str,
             start = vr_meta[i, j][0]
             if start == vrb_enum.NO_REF_INDEX.value:
                 continue
-            # if not(i==11 and j==112):
+            # if i!=1 or j!=117:
             #     continue
             ii.append(i)
             jj.append(j)
@@ -257,7 +289,7 @@ def single_subgrid_rsater_transform(fname: str,
                                     rasters_dir: str,
                                     i: int,
                                     j: int,
-                                    tf: Transformer,
+                                    tf,
                                     nodata_value
                                     ) -> tuple[Optional[int], Optional[np.ndarray]]:
     """
@@ -349,7 +381,7 @@ def single_subgrid_rsater_transform(fname: str,
 
 def subgrid_raster_transform(fname: str,
                              rasters_dir: str,
-                             tf: Transformer,
+                             tf,
                              ) -> tuple[list[int], list[float]]:
     """
     Identify the subgrids within the vrbag and return the starting
@@ -384,12 +416,6 @@ def subgrid_raster_transform(fname: str,
             start = vr_meta[i, j][0]
             if start == vrb_enum.NO_REF_INDEX.value:
                 continue
-
-
-            # if not(i==11 and j==112):
-            #     continue        
-
-
             ii.append(i)
             jj.append(j)
     bag.close()
@@ -408,10 +434,87 @@ def subgrid_raster_transform(fname: str,
     return start_indices, transformed_refs
 
 
+def corner_points(fname: str) -> tuple[float, float, float, float]:
+    """
+    Return the corner points indicated in the xml metadata.
+
+    Parameters
+    ----------
+    fname : str
+        Absolute path to the vrbag file.
+
+    Returns
+    ----------
+    str
+        corner points: x1, y1, x2, y2
+    """
+    bag = h5py.File(fname)
+    meta = bag["BAG_root/metadata"]
+    buffer = BytesIO(meta[()])
+    tree = etree.parse(buffer)
+    root = tree.getroot()
+    gml = ".//{" + root.nsmap['gml'] + "}"
+    p1, p2 = root.find(f"{gml}coordinates").text.split(" ")
+    x1, y1 = p1.split(",")
+    x2, y2 = p2.split(",")
+    return float(x1), float(y1), float(x2), float(y2) 
+
+
+def change_corner_points_and_wkt(fname: str,
+                                 new_points: str,
+                                 wkt_h: str,
+                                 wkt_v: str
+                                 ) -> None:
+    """
+    Update the xml metadata's corner points, horizontal, and vertical WKTs with new values.
+
+    Parameters
+    ----------
+    fname : str
+        Absolute path to the vrbag file.
+    new_points: str
+        The new corners points in string format x1,y1 x2,y2. Will be ignored when None.
+    wkt_h: str
+        WKT string for the horizontal component of the CRS. Will be ignored when None.
+    wkt_v: str
+        WKT string for the vertical component of the CRS. Will be ignored when None.
+
+    Returns
+    ----------
+    None
+    """
+    bag = h5py.File(fname)
+    meta = bag["BAG_root/metadata"]
+    buffer = BytesIO(meta[()])
+    tree = etree.parse(buffer)
+    root = tree.getroot()
+    gml = ".//{" + root.nsmap['gml'] + "}"
+    gco = ".//{" + root.nsmap['gco'] + "}"
+    root.find(f"{gml}coordinates").text = new_points
+    root.findall(f"{gco}CharacterString")[6].text = wkt_h
+    root.findall(f"{gco}CharacterString")[8].text = wkt_v
+    # tree.write(xml_fname)
+    # xml = etree.tostring(root, pretty_print=True).decode("ascii")
+    xmet = etree.tostring(root).decode()
+    bag.close()
+    bag = h5py.File(fname, mode="r+")
+    root = bag.require_group("/BAG_root")
+    del bag["/BAG_root/metadata"]
+    metadata = np.array(list(xmet), dtype="S1")
+    root.create_dataset("metadata",
+                        maxshape=(None,),
+                        data=metadata,
+                        compression="gzip",
+                        compression_opts=9
+                        )
+    bag.close()
+    return
+
+
 def update_vr_refinements(fname: str,
                           index: list[int],
                           arr: list[np.ndarray],
-                          tf: Transformer) -> None:
+                          tf) -> None:
     """
     Update the `varres_refinements` layer in the vrbag file with the
     `arr` values starting form `index` location in the `varres_refinements`.
@@ -459,29 +562,84 @@ def update_vr_refinements(fname: str,
     # update the base grid and its attributes
     zt = base_grid_point_transform(fname=fname, tf=tf, nodata_value=vrb_enum.NDV_REF.value)
     update_vr_elevation(fname=fname, arr=zt)
+    # update xml
+    x1, y1, x2, y2 = corner_points(fname=fname)
+    y1, x1, _ = tf.transform_points(y1, x1, 0, always_xy=False, allow_ballpark=False)
+    y2, x2, _ = tf.transform_points(y2, x2, 0, always_xy=False, allow_ballpark=False)
+    if tf.crs_to.is_compound:
+        wkt_h = tf.crs_to.sub_crs_list[0].to_wkt()
+        wkt_v = tf.crs_to.sub_crs_list[1].to_wkt()
+    else:
+        wkt_h = tf.crs_to.to_wkt()
+        wkt_v = ""
+    wkt_h = wkt_h if wkt_h else ""
+    wkt_v = wkt_v if wkt_v else ""
+    change_corner_points_and_wkt(fname=fname,
+                                 new_points=f"{x1},{y1} {x2},{y2}",
+                                 wkt_h=wkt_h,
+                                 wkt_v=wkt_v
+                                 )
     return
 
 
-if __name__ == "__main__":
-    fname = r"C:\Users\mohammad.ashkezari\Desktop\original_vrbag\W00656_MB_VR_MLLW_5of5.bag"
-    ############ raster transformation ##############
+def transform_vr(fname: str,
+                 tf,
+                 point_transformation: bool = True,
+                 **kwargs
+                 ):
+    """
+    Transform vrbag according to the `tf` Transformer object.
+    When `point_transformation` is True, point transformation is applied, otherwise
+    vrbag is split into rasters and raster transformation is applied. When raster transformation
+    is chosen, a new keyword argument `rasters_dir` must be passed that specifies where the subgrid
+    rasters are stored.
+
+    Parameters
+    ----------
+    fname : str
+        Absolute path to the vrbag file.
+    index: list[int]
+        A list of starting index where the refinements get updated.
+    arr: list[np.ndarray]
+        List of numpy array representing the refinements values to be updated.
+    tf: vyperdatum.transformer.Transformer
+        Instance of the transformer class.
+    rasters_dir: str
+        Absolute path to the directory where the output TIFF files will be stored.
+        When raster transformation is chosen, this parameter must be passed
+        which specifies where the subgrid rasters are stored. It can point to a local
+        dir (e.g. `rasters_dir = "./sub_grids/"`) or GDAL virtual file system
+        (e.g. `rasters_dir = "/vsimem/sub_grids/"`).
+
+    Raises
+    ----------
+    TypeError
+        If the passed BAG file is not a valid variable resolution bag file.
+    KeyError
+        When raster transformation is chosen (`point_transformation = False`), and `rasters_dir`
+        parameter is not passed to the function.
+
+    Returns
+    ----------
+    None
+    """
+    if not is_vr(fname=fname):
+        msg = (f"The following file is not a valid variable resolution bag file: {fname}")
+        logger.exception(msg)
+        raise TypeError(msg)
+    if not point_transformation and "rasters_dir" not in kwargs.keys():
+        msg = ("For raster transformation approach, you must pass `rasters_dir` parameter"
+               " to the `transform_vr` function.")
+        logger.exception(msg)
+        raise KeyError(msg)
     tic = time.time()
-    crs_from = "EPSG:32617+EPSG:5866"
-    crs_to = "EPSG:26917+EPSG:5866"
-    # steps=["EPSG:32617+EPSG:5866", "EPSG:9755+EPSG:5866", "EPSG:6318+EPSG:5866", "EPSG:26917+EPSG:5866"]
-    steps = ["EPSG:32617+EPSG:5866", "EPSG:9755", "EPSG:6318", "EPSG:26917+EPSG:5866"]
-    tf = Transformer(crs_from=crs_from, crs_to=crs_to, steps=steps)
-    ############ raster transformation ##############
-    # index, zt = subgrid_raster_transform(fname=fname,
-    #                                      rasters_dir="./sub_grids/",
-    #                                     #  rasters_dir="/vsimem/sub_grids/",
-    #                                      tf=tf
-    #                                      )
-
-
-    ############ point transformation ##############
-    index, zt = subgrid_point_transform(fname, tf=tf)
-
-
-    print("total time: ", time.time() - tic)
+    if point_transformation:
+        index, zt = subgrid_point_transform(fname, tf=tf)
+    else:
+        index, zt = subgrid_raster_transform(fname=fname,
+                                             rasters_dir=kwargs["rasters_dir"],
+                                             tf=tf
+                                             )
     update_vr_refinements(fname=fname, index=index, arr=zt, tf=tf)
+    logger.info(f"VRBAG transformation processing time: {time.time() - tic:.2f}", )
+    return

@@ -1,5 +1,6 @@
 import os
 import pathlib
+import shutil
 import logging
 from pprint import pformat
 from typing import Union, Optional
@@ -12,6 +13,7 @@ from tqdm import tqdm
 from vyperdatum.utils import raster_utils, crs_utils
 from vyperdatum.utils.raster_utils import raster_metadata
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate_raster
+from vyperdatum.drivers import vrbag
 
 
 logger = logging.getLogger("root_logger")
@@ -138,6 +140,42 @@ class Transformer():
             logger.exception("Error while running the point transformation.")
             return None, None, None
         return xt, yt, zt
+
+    def transform_vrbag(self, input_file: str, output_file: str):
+        """
+        Check if the input file (`input_file`) exists and supported by GDAL.
+
+        Parameters
+        -----------
+        input_file: str
+            Path to the input vrbag file.
+        output_file: str
+            Path to the output transformed vrbag file.
+
+        Raises
+        -------
+        FileNotFoundError:
+            If the input raster file is not found.
+        TypeError
+            If the passed BAG file is not a valid variable resolution bag file.
+
+        Returns
+        -----------
+        None
+        """
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(f"The input file not found at {input_file}.")
+        if not vrbag.is_vr(fname=input_file):
+            msg = (f"The following file is not a valid variable resolution bag file: {input_file}")
+            logger.exception(msg)
+            raise TypeError(msg)
+        try:
+            shutil.copy2(input_file, output_file)
+            vrbag.transform_vr(fname=output_file, tf=self, point_transformation=True)
+        except:
+            if os.path.isfile(output_file):
+                os.remove(output_file)
+        return
 
     @staticmethod
     def gdal_extensions() -> list[str]:
