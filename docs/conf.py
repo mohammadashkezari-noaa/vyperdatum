@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath("../vyperdatum"))
 project = "Vyperdatum"
 copyright = "2024, Mohammad Ashkezari"
 author = "Mohammad Ashkezari"
-release = "0.3.2"
+release = "0.3.4"
 
 extensions = ["sphinx.ext.todo", "sphinx.ext.viewcode", "sphinx.ext.autodoc", "notfound.extension"]
 
