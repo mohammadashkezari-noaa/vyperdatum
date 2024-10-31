@@ -3,6 +3,7 @@ import numpy as np
 import pathlib
 from collections import Counter
 from typing import Tuple
+import pyproj as pp
 
 
 class NPZ():
@@ -11,7 +12,7 @@ class NPZ():
 
     Attributes
     ----------
-    fname: str
+    input_file: str
         Full path to the npz file.
     content: np.lib.npyio.NpzFile
         The object containing the numpy arrays stored in the npz file.
@@ -24,21 +25,38 @@ class NPZ():
     >>> mmx, mmy, mmz, mmu = npz.minmax()
     """
 
-    def __init__(self, fname: str) -> None:
+    def __init__(self, input_file: str, invalid_error: bool = True) -> None:
         """
         Load a numpy .npz file (collection of numpy arrays).
 
         Parameters
         ----------
-        fname: str
+        input_file: str
             Full file path.
+        invalid_error: bool, default True
+            If True, throws an error when the input file has an unexpected format.
+
+        Raises
+        --------
+        ValueError:
+            If the input file is not recognized as npz file.
+
+        Returns
+        -----------
+        None
         """
-        self.fname = fname
+        self.input_file = input_file
         self.content = self.load()
+        schema = ["wkt", "data", "minmax"]
+        self.is_npz = Counter(self.content.files) == Counter(schema)
+        if invalid_error and not self.is_npz:
+            raise ValueError(("Expected the following keys in the .npz file: "
+                              f"{schema}, but receieved {self.content.files}."))
 
     def load(self) -> np.lib.npyio.NpzFile:
         """
         Load a numpy .npz file (collection of numpy arrays).
+        Return None when any exception take place or when the file is invalid. 
 
         Raises
         --------
@@ -51,21 +69,20 @@ class NPZ():
 
         Returns
         --------
-        numpy.lib.npyio.NpzFile
+        Optional[numpy.lib.npyio.NpzFile]
         """
-        if not self.fname:
-            raise ValueError("Invalid or unspecified .npz file path.")
-        fname = pathlib.Path(self.fname)
-        if not fname.is_file():
-            raise FileNotFoundError(f"The npz file not found at: {fname}")
-        if fname.suffix.lower() != ".npz":
-            warnings.warn(("Expected a file with '.npz' extension"
-                           f"but receieved {fname.suffix.lower()}."))
-        schema = ["wkt", "data", "minmax"]
-        bundle = np.load(fname)
-        if Counter(bundle.files) != Counter(schema):
-            raise TypeError(("Expected the following keys in the .npz file: "
-                             f"{schema}, but receieved {bundle.files}."))
+        try:
+            if not self.input_file:
+                raise ValueError("Invalid or unspecified .npz file path.")
+            input_file = pathlib.Path(self.input_file)
+            if not input_file.is_file():
+                raise FileNotFoundError(f"The npz file not found at: {input_file}")
+            if input_file.suffix.lower() != ".npz":
+                warnings.warn(("Expected a file with '.npz' extension"
+                               f"but receieved {input_file.suffix.lower()}."))            
+            bundle = np.load(input_file)
+        except:
+            return None
         return bundle
 
     def xyzu(self) -> Tuple[np.ndarray]:
@@ -121,3 +138,25 @@ class NPZ():
         mmz = self.content["minmax"][:, 2]
         mmu = self.content["minmax"][:, 3]
         return mmx, mmy, mmz, mmu
+
+    def transform(self, transformer_instance) -> None:
+        """
+        Apply point transformation on npz data according to the `transformer_instance`.
+
+        Parameters
+        -----------
+        transformer_instance: vyperdatum.transformer.Transform
+            Instance of the transformer class.
+
+        Returns
+        -----------
+        None
+        """
+        x, y, z, u = self.xyzu()
+        xx, yy, zz = transformer_instance.transform_points(x, y, z)
+        target_wkt = transformer_instance.crs_to.to_wkt()
+        data = np.zeros([len(x), 4], dtype=np.float64)
+        data[:, 0], data[:, 1], data[:, 2], data[:, 3] = xx, yy, zz, u
+        minmax = np.array([np.min(data, 0), np.max(data, 0)])
+        np.savez(self.input_file, wkt=np.array(target_wkt), data=data, minmax=minmax)
+        return

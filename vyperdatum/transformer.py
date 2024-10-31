@@ -13,7 +13,7 @@ from tqdm import tqdm
 from vyperdatum.utils import raster_utils, crs_utils
 from vyperdatum.utils.raster_utils import raster_metadata
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate_raster
-from vyperdatum.drivers import vrbag, laz
+from vyperdatum.drivers import vrbag, laz, npz
 
 
 logger = logging.getLogger("root_logger")
@@ -60,6 +60,91 @@ class Transformer():
             self.steps = [crs_utils.auth_code(self.crs_from), crs_utils.auth_code(self.crs_to)]
         if not crs_utils.validate_transform_steps(self.steps):
             raise ValueError("Invalid transformation pipeline.")
+        return
+
+    @staticmethod
+    def gdal_extensions() -> list[str]:
+        """
+        Return a lower-cased list of driver names supported by gdal.
+
+        Returns
+        -------
+        list[str]
+        """
+        return sorted(
+            ["." + gdal.GetDriver(i).ShortName.lower() for i in range(gdal.GetDriverCount())]
+            + [".tif", ".tiff"]
+            )
+
+    def _validate_input_file(self, input_file: str) -> bool:
+        """
+        Check if the input file (`input_file`) exists and supported by GDAL.
+
+        Raises
+        -------
+        FileNotFoundError:
+            If the input raster file is not found.
+        NotImplementedError:
+            If the input vector file is not supported by gdal.
+
+        Parameters
+        -----------
+        input_file: str
+            Path to the input raster file (gdal supported).
+
+        Returns
+        -----------
+        bool
+            True if passes all checks, otherwise False.
+        """
+        passed = False
+        if "vsimem" not in [s.lower() for s in input_file.split("/")] and not os.path.isfile(input_file):
+            raise FileNotFoundError(f"The input raster file not found at {input_file}.")
+        if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
+            raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
+        passed = True
+        return passed
+
+    def transform(self, input_file: str, output_file: str):
+        """
+        Top-level transform method.
+
+        Parameters
+        -----------
+        input_file: str
+            Path to the input file.
+        output_file: str
+            Path to the output transformed file.
+
+        Raises
+        -------
+        FileNotFoundError:
+            If the input  file is not found.
+        NotImplementedError:
+            If the input file is not supported by vyperdatum.
+
+        Returns
+        -----------
+        None
+        """
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(f"The input file not found at {input_file}.")
+
+        if vrbag.is_vr(fname=input_file):
+            logger.info(f"Identified as vrbag file: {input_file}")
+            self.transform_vrbag(input_file=input_file, output_file=output_file)
+        elif laz.LAZ(input_file=input_file, invalid_error=False).is_laz:
+            logger.info(f"Identified as laz file: {input_file}")
+            self.transform_laz(input_file=input_file, output_file=output_file)
+        elif npz.NPZ(input_file=input_file, invalid_error=False).is_npz:
+            logger.info(f"Identified as npz file: {input_file}")
+            self.transform_npz(input_file=input_file, output_file=output_file)
+        elif pathlib.Path(input_file).suffix.lower() in self.gdal_extensions():
+            logger.info(f"Identified as GDAL-supported raster file: {input_file}")
+            self.transform_raster(input_file=input_file, output_file=output_file)
+        # elif vector files
+        else:
+            raise NotImplementedError(f"Unsupported input file: {input_file}")
         return
 
     def transform_points(self,
@@ -170,8 +255,9 @@ class Transformer():
             logger.exception(msg)
             raise TypeError(msg)
         try:
+            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             shutil.copy2(input_file, output_file)
-            vrbag.transform_vr(fname=output_file, tf=self, point_transformation=True)
+            vrbag.transform(fname=output_file, tf=self, point_transformation=True)
         except:
             if os.path.isfile(output_file):
                 os.remove(output_file)
@@ -191,7 +277,7 @@ class Transformer():
         Raises
         -------
         FileNotFoundError:
-            If the input  file is not found.
+            If the input file is not found.
         TypeError
             If the passed LAZ file is not valid.
 
@@ -202,56 +288,48 @@ class Transformer():
         if not os.path.isfile(input_file):
             raise FileNotFoundError(f"The input file not found at {input_file}.")
         try:
+            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             shutil.copy2(input_file, output_file)
             lz = laz.LAZ(input_file=output_file)
-            lz.transform_laz(transformer_instance=self)
+            lz.transform(transformer_instance=self)
         except:
             if os.path.isfile(output_file):
                 os.remove(output_file)
         return
 
-    @staticmethod
-    def gdal_extensions() -> list[str]:
+    def transform_npz(self, input_file: str, output_file: str):
         """
-        Return a lower-cased list of driver names supported by gdal.
-
-        Returns
-        -------
-        list[str]
-        """
-        return sorted(
-            ["." + gdal.GetDriver(i).ShortName.lower() for i in range(gdal.GetDriverCount())]
-            + [".tif", ".tiff"]
-            )
-
-    def _validate_input_file(self, input_file: str) -> bool:
-        """
-        Check if the input file (`input_file`) exists and supported by GDAL.
-
-        Raises
-        -------
-        FileNotFoundError:
-            If the input raster file is not found.
-        NotImplementedError:
-            If the input vector file is not supported by gdal.
+        Transform a numpy npz file.
 
         Parameters
         -----------
         input_file: str
-            Path to the input raster file (gdal supported).
+            Path to the input npz file.
+        output_file: str
+            Path to the output transformed npz file.
+
+        Raises
+        -------
+        FileNotFoundError:
+            If the input file is not found.
+        TypeError
+            If the passed npz file is not valid.
 
         Returns
         -----------
-        bool
-            True if passes all checks, otherwise False.
+        None
         """
-        passed = False
-        if "vsimem" not in [s.lower() for s in input_file.split("/")] and not os.path.isfile(input_file):
-            raise FileNotFoundError(f"The input raster file not found at {input_file}.")
-        if pathlib.Path(input_file).suffix.lower() not in self.gdal_extensions():
-            raise NotImplementedError(f"{pathlib.Path(input_file).suffix} is not supported")
-        passed = True
-        return passed
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(f"The input file not found at {input_file}.")
+        try:
+            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
+            shutil.copy2(input_file, output_file)
+            nz = npz.NPZ(input_file=output_file)
+            nz.transform(transformer_instance=self)
+        except:
+            if os.path.isfile(output_file):
+                os.remove(output_file)
+        return
 
     def transform_raster(self,
                          input_file: str,
@@ -374,8 +452,8 @@ class Transformer():
                                                             target_crs=t_crs,
                                                             vertical_transform=v_shift
                                                             )
+            input_metadata = raster_metadata(input_file)
             if overview and input_metadata["driver"].lower() == "gtiff":
-                input_metadata = raster_metadata(input_file)
                 raster_utils.add_overview(raster_file=output_file,
                                           compression=input_metadata["compression"]
                                           )
@@ -433,7 +511,7 @@ class Transformer():
             True if successful, otherwise False.
         """
         try:
-            self._validate_input_file(input_file)            
+            self._validate_input_file(input_file)
             pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             pbar, success = None, False
             ds = gdal.OpenEx(input_file)

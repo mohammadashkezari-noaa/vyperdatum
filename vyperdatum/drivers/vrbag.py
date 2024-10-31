@@ -582,11 +582,11 @@ def update_vr_refinements(fname: str,
     return
 
 
-def transform_vr(fname: str,
-                 tf,
-                 point_transformation: bool = True,
-                 **kwargs
-                 ):
+def transform(fname: str,
+              tf,
+              point_transformation: bool = True,
+              **kwargs
+              ):
     """
     Transform vrbag according to the `tf` Transformer object.
     When `point_transformation` is True, point transformation is applied, otherwise

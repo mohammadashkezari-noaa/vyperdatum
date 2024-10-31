@@ -11,19 +11,21 @@ gdal.UseExceptions()
 
 
 class LAZ():
-    def __init__(self, input_file: str) -> None:
+    def __init__(self, input_file: str, invalid_error: bool = True) -> None:
         """
         Parameters
         -----------
         input_file: str
             Path to the input laz file.
+        invalid_error: bool, default True
+            If True, throws an error when the input file has an unexpected format.
 
         Raises
         -------
         FileNotFoundError:
             If the input file is not found.
-        TypeError
-            If the passed LAZ file is not valid.
+        ValueError
+            If the passed input file is not recognized as laz file.
 
         Returns
         -----------
@@ -32,7 +34,8 @@ class LAZ():
         self.input_file = input_file
         if not os.path.isfile(self.input_file):
             raise FileNotFoundError(f"The input file not found at {input_file}.")
-        if not self.get_points():
+        self.is_laz = self.get_points()
+        if invalid_error and not self.is_laz:
             msg = (f"The following file is not a valid LAZ file: {self.input_file}")
             logger.exception(msg)
             raise TypeError(msg)
@@ -57,7 +60,7 @@ class LAZ():
             valid = False
         return valid
 
-    def get_wkt(self) -> str:
+    def wkt(self) -> str:
         """
         Return the LAZ WKT string.
 
@@ -67,10 +70,10 @@ class LAZ():
             WKT associated with file's CRS.
         """
         with laspy.open(self.input_file) as lf:
-            wkt = lf.header.parse_crs().to_wkt()
-        return wkt
+            w = lf.header.parse_crs().to_wkt()
+        return w
 
-    def transform_laz(self, transformer_instance) -> None:
+    def transform(self, transformer_instance) -> None:
         """
         Apply point transformation on the laz data according to the `transformer_instance`.
 
