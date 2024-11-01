@@ -329,6 +329,25 @@ class Pipeline():
         self.steps = temp_steps
         return self.steps
 
+    def transformation_steps(self, method: str = "linear") -> Optional[list[str]]:
+        """
+        Return transformation steps the source and target CRSs using an
+        algorithm specified by `method`.
+
+        Parameters
+        -----------
+        method: str, default 'linear'
+            An algorithm using which the transformation steps are generated.
+            Possible values: 'linear', 'graph'
+        """
+        method = method.lower().strip()
+        if method == "linear":
+            return self.linear_steps()
+        elif method == "graph":
+            return self.graph_steps()
+        else:
+            logger.error("Invalid method name to generate transformation steps.")
+        return None
 
 if __name__ == "__main__":
     # ! Error: noop, Invalid transformation step: EPSG:4326 --> EPSG:9755
