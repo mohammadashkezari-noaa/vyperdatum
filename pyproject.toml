@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vyperdatum"
-version = "0.3.9"
+version = "0.3.10"
 authors = [
     {name = "Mohammad Ashkezari", email = "mohammad.ashkezari@noaa.gov"},
 ]
@@ -24,6 +24,8 @@ dependencies = [
     "pydantic",
     "networkx",
     "h5py",
+    "lxml",
+    "requests",
     "laspy"
 ]
 classifiers = [

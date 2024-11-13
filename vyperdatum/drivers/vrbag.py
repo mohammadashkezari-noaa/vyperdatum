@@ -260,13 +260,13 @@ def subgrid_point_transform(fname: str,
     bag = h5py.File(fname)
     root = bag["BAG_root"]
     vr_meta = root["varres_metadata"]
-    start_indices, transformed_refs, ii, jj = [], [], [], []    
+    start_indices, transformed_refs, ii, jj = [], [], [], []
     for i in tqdm(range(vr_meta.shape[0]), desc="Search for refined subgrids"):
         for j in range(vr_meta.shape[1]):
             start = vr_meta[i, j][0]
             if start == vrb_enum.NO_REF_INDEX.value:
                 continue
-            # if i!=1 or j!=117:
+            # if i != 1 or j != 117:
             #     continue
             ii.append(i)
             jj.append(j)
@@ -318,7 +318,7 @@ def single_subgrid_rsater_transform(fname: str,
     try:
         bm = raster_metadata(fname)
         geot = bm["geo_transform"]
-        wkt = bm["wkt"]
+        wkt_str = bm["wkt"]
 
         bag = h5py.File(fname)
         root = bag["BAG_root"]
@@ -341,7 +341,7 @@ def single_subgrid_rsater_transform(fname: str,
         sub_raster_fname = f"{rasters_dir}{i}_{j}.tiff"
         out_ds = driver.Create(sub_raster_fname, sub_grid.shape[1],
                                sub_grid.shape[0], 1, gdal.GDT_Float32)
-        out_ds.SetProjection(wkt)
+        out_ds.SetProjection(wkt_str)
         out_ds.SetGeoTransform(sub_geot)
         band = out_ds.GetRasterBand(1)
         band.WriteArray(sub_grid)
@@ -368,7 +368,7 @@ def single_subgrid_rsater_transform(fname: str,
             f.write(msg)
             f.close()
 
-    except Exception as e:        
+    except Exception as e:
         logger.exception(f"Unexpected exception in single_subgrid_rsater_transform: {e}")
 
         f = open("error.txt", "a")
@@ -643,3 +643,10 @@ def transform(fname: str,
     update_vr_refinements(fname=fname, index=index, arr=zt, tf=tf)
     logger.info(f"VRBAG transformation processing time: {time.time() - tic:.2f}", )
     return
+
+
+def wkt(fname: str) -> str:
+    """
+    Return wkt retrieved by GDAL.
+    """
+    return raster_metadata(fname)["wkt"]

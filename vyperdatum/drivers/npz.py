@@ -4,9 +4,9 @@ import pathlib
 from collections import Counter
 from typing import Tuple
 import pyproj as pp
+from vyperdatum.drivers.base import Driver
 
-
-class NPZ():
+class NPZ(Driver):
     """
     Handle loading and parsing of a .npz (numpy arrays) file.
 
@@ -45,10 +45,14 @@ class NPZ():
         -----------
         None
         """
+        super().__init__()
         self.input_file = input_file
         self.content = self.load()
         schema = ["wkt", "data", "minmax"]
-        self.is_npz = Counter(self.content.files) == Counter(schema)
+        try:
+            self.is_npz = Counter(self.content.files) == Counter(schema)
+        except:
+            self.is_npz = False
         if invalid_error and not self.is_npz:
             raise ValueError(("Expected the following keys in the .npz file: "
                               f"{schema}, but receieved {self.content.files}."))
@@ -76,14 +80,12 @@ class NPZ():
                 raise ValueError("Invalid or unspecified .npz file path.")
             input_file = pathlib.Path(self.input_file)
             if not input_file.is_file():
-                raise FileNotFoundError(f"The npz file not found at: {input_file}")
-            if input_file.suffix.lower() != ".npz":
-                warnings.warn(("Expected a file with '.npz' extension"
-                               f"but receieved {input_file.suffix.lower()}."))            
+                raise FileNotFoundError(f"The npz file not found at: {input_file}")         
             bundle = np.load(input_file)
         except:
             return None
         return bundle
+
 
     def xyzu(self) -> Tuple[np.ndarray]:
         """
@@ -160,3 +162,7 @@ class NPZ():
         minmax = np.array([np.min(data, 0), np.max(data, 0)])
         np.savez(self.input_file, wkt=np.array(target_wkt), data=data, minmax=minmax)
         return
+
+    @property
+    def is_valid(self):
+        return self.is_npz

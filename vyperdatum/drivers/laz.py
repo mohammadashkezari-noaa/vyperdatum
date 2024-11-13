@@ -4,13 +4,13 @@ from osgeo import gdal
 import laspy
 import numpy as np
 import pyproj as pp
-
+from vyperdatum.drivers.base import Driver
 
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
 
 
-class LAZ():
+class LAZ(Driver):
     def __init__(self, input_file: str, invalid_error: bool = True) -> None:
         """
         Parameters
@@ -31,6 +31,7 @@ class LAZ():
         -----------
         None
         """
+        super().__init__()
         self.input_file = input_file
         if not os.path.isfile(self.input_file):
             raise FileNotFoundError(f"The input file not found at {input_file}.")
@@ -39,6 +40,7 @@ class LAZ():
             msg = (f"The following file is not a valid LAZ file: {self.input_file}")
             logger.exception(msg)
             raise TypeError(msg)
+        return
 
     def get_points(self) -> bool:
         """
@@ -92,3 +94,7 @@ class LAZ():
         lf.header.add_crs(transformer_instance.crs_to)
         lf.write(self.input_file)
         return
+
+    @property
+    def is_valid(self):
+        return self.is_laz

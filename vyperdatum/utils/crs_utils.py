@@ -26,8 +26,14 @@ def auth_code(crs: pp.CRS, raise_no_auth: bool = True) -> Optional[str]:
         crs = pp.CRS(crs)
     ac = crs.to_authority(min_confidence=100)
     if not ac and crs.is_compound:
-        h = ":".join(pp.CRS(crs.sub_crs_list[0]).to_authority())
-        v = ":".join(pp.CRS(crs.sub_crs_list[1]).to_authority())
+        try:
+            h = ":".join(pp.CRS(crs.sub_crs_list[0]).to_authority())
+        except:
+            h = "UnknownAuthorityCode"
+        try:
+            v = ":".join(pp.CRS(crs.sub_crs_list[1]).to_authority())
+        except:
+            v = "UnknownAuthorityCode"
         return f"{h}+{v}"
 
     if not ac and raise_no_auth:
