@@ -14,7 +14,7 @@ logger = logging.getLogger("root_logger")
 class DB:
 
     def __init__(self,
-                 db_dir: Optional[str] = pp.datadir.get_data_dir()
+                 db_dir: Optional[str] = enuPDB.DIR.value
                  ) -> None:
         """
 

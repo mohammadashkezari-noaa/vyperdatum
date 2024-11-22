@@ -403,14 +403,14 @@ def vdatum_cross_validate_raster(s_wkt: str,
     # t_wkt = target_meta["wkt"]
 
     passed = True
-    if not region:
-        region = "contiguous"
-        # if len(source_meta["overlapping_regions"]) != 1:
-        #     logger.warning("The input is not overlapping with a single region."
-        #                    f" The overlapping regions: ({source_meta['overlapping_regions']})."
-        #                    " The Vdatum API region will be set to 'contiguous'.")
-        # else:
-        #     region = api_region_alias(source_meta["overlapping_regions"][0])
+    # if not region:
+    #     region = "contiguous"
+    #     if len(source_meta["overlapping_regions"]) != 1:
+    #         logger.warning("The input is not overlapping with a single region."
+    #                        f" The overlapping regions: ({source_meta['overlapping_regions']})."
+    #                        " The Vdatum API region will be set to 'contiguous'.")
+    #     else:
+    #         region = api_region_alias(source_meta["overlapping_regions"][0])
 
     source_crs_h, source_crs_v = wkt_to_crs(s_wkt)
     source_zone_h = wkt_to_utm(s_wkt)

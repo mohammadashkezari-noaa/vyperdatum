@@ -184,7 +184,9 @@ class Transformer():
                          allow_ballpark: Optional[bool] = False,
                          force_over: bool = False,
                          only_best: Optional[bool] = True
-                         ):
+                         ) -> tuple[Optional[Union[list, np.ndarray]],
+                                    Optional[Union[list, np.ndarray]],
+                                    Optional[Union[list, np.ndarray]]]:
         """
         Conduct point transformation between two coordinate reference systems.        
 
@@ -249,6 +251,31 @@ class Transformer():
                                                      ).transform(xt, yt, zt)
 
 
+            # if vdatum_check:
+            #     vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_wkt=pp.CRS(self.steps[0]).to_wkt(),
+            #                                                         t_wkt=pp.CRS(self.steps[-1]).to_wkt(),
+            #                                                         n_sample=20,
+            #                                                         s_raster_metadata=None,
+            #                                                         t_raster_metadata=None,
+            #                                                         s_point_samples=...,
+            #                                                         t_point_samples=..,
+            #                                                         tolerance=0.3,
+            #                                                         raster_sampling_band=1,
+            #                                                         region=None,
+            #                                                         pivot_h_crs="EPSG:6318",
+            #                                                         s_h_frame=None,
+            #                                                         s_v_frame=None,
+            #                                                         s_h_zone=None,
+            #                                                         t_h_frame=None,
+            #                                                         t_v_frame=None,
+            #                                                         t_h_zone=None
+            #                                                         )
+            #     if not vdatum_cv:
+            #         success = False
+            #         csv_path = os.path.join(os.path.split(output_file)[0], "vdatum_check.csv")
+            #         vdatum_df.to_csv(csv_path, index=False)
+            #         logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
+            #         print(Style.RESET_ALL)
 
 
         except Exception:
@@ -588,13 +615,15 @@ class Transformer():
                                           compression=input_metadata["compression"]
                                           )
                 # raster_utils.add_rat(output_file)
+
+            success = True
             if vdatum_check:
                 output_metadata = raster_metadata(output_file)
                 vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_wkt=input_metadata["wkt"],
                                                                     t_wkt=output_metadata["wkt"],
                                                                     n_sample=20,
-                                                                    s_metadata_raster=input_metadata,
-                                                                    t_metadata_raster=output_metadata,
+                                                                    s_raster_metadata=input_metadata,
+                                                                    t_raster_metadata=output_metadata,
                                                                     s_point_samples=None,
                                                                     t_point_samples=None,
                                                                     tolerance=0.3,
@@ -609,11 +638,11 @@ class Transformer():
                                                                     t_h_zone=None
                                                                     )
                 if not vdatum_cv:
+                    success = False
                     csv_path = os.path.join(os.path.split(output_file)[0], "vdatum_check.csv")
                     vdatum_df.to_csv(csv_path, index=False)
                     logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
                     print(Style.RESET_ALL)
-            success = True
         finally:
             for mf in middle_files:
                 os.remove(mf)
