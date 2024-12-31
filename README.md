@@ -15,8 +15,7 @@ Vyperdatum requires `GDAL` which can be installed from the conda's conda-forge c
 ```bash
 conda create -n vd python=3.11
 conda activate vd
-conda install -c conda-forge gdal=3.8.4
-conda install -c conda-forge python-pdal
+conda install -c conda-forge proj=9.4 gdal=3.8.4 python-pdal
 pip install vyperdatum
 ```
 Before running vyperdatum, you need to copy NOAA's datum files and the updated `proj.db` into the PROJ data directory [download link will be added here]. This process may get automated in the future. The Proj data directory path can be found here:

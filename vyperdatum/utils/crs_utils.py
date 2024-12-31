@@ -24,6 +24,7 @@ def auth_code(crs: pp.CRS, raise_no_auth: bool = True) -> Optional[str]:
     """
     if isinstance(crs, str):
         crs = pp.CRS(crs)
+    ## might fail for pyproj.CRS("EPSG:4269").geodetic_crs.to_3d().to_authority(min_confidence=100)
     ac = crs.to_authority(min_confidence=100)
     if not ac and crs.is_compound:
         try:
@@ -35,7 +36,6 @@ def auth_code(crs: pp.CRS, raise_no_auth: bool = True) -> Optional[str]:
         except:
             v = "UnknownAuthorityCode"
         return f"{h}+{v}"
-
     if not ac and raise_no_auth:
         raise ValueError(f"Unable to produce authority name and code for this crs:\n{crs}")
     return ":".join(ac)
@@ -67,14 +67,26 @@ def vertical_shift(crs_from: pp.CRS, crs_to: pp.CRS) -> bool:
     if crs_from.equals(crs_to):
         return False
     vertical = False
-    if (not crs_from.is_projected and not crs_to.is_projected
-        and len(crs_from.axis_info) + len(crs_to.axis_info) == 5):  # 2D+3D
-        vertical = True
-    if len(crs_from.axis_info) + len(crs_to.axis_info) == 6:  # 3D + 3D
+    # if (not crs_from.is_projected and not crs_to.is_projected
+    #     and len(crs_from.axis_info) + len(crs_to.axis_info) == 5):  # 2D+3D
+    #     vertical = True
+    # if len(crs_from.axis_info) + len(crs_to.axis_info) == 6:  # 3D + 3D
+    #     s_v = crs_from.sub_crs_list[1] if crs_from.is_compound else None
+    #     t_v = crs_to.sub_crs_list[1] if crs_to.is_compound else None
+    #     if s_v is None and t_v is None and crs_from.datum.ellipsoid != crs_to.datum.ellipsoid:
+    #         vertical = True
+    #     elif s_v != t_v:
+    #         vertical = True
+
+    if crs_from.is_compound or crs_to.is_compound:
         s_v = crs_from.sub_crs_list[1] if crs_from.is_compound else None
         t_v = crs_to.sub_crs_list[1] if crs_to.is_compound else None
-        if s_v == t_v is None or s_v != t_v:
+        if s_v != t_v:
             vertical = True
+    elif (crs_from.datum.ellipsoid and  # WGS84-based CRS datum's ellipsoid is None
+          crs_to.datum.ellipsoid and
+          crs_from.datum.ellipsoid != crs_to.datum.ellipsoid):
+        vertical = True
     return vertical
 
 

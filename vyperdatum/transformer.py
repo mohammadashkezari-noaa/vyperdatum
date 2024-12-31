@@ -12,7 +12,7 @@ from osgeo import gdal, osr, ogr
 from tqdm import tqdm
 from vyperdatum.utils import raster_utils, crs_utils, drivers_utils
 from vyperdatum.utils.raster_utils import raster_metadata
-from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate_raster
+from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
 from vyperdatum.drivers import vrbag, laz, npz, pdal_based
 
 
@@ -108,7 +108,8 @@ class Transformer():
     def transform(self,
                   input_file: str,
                   output_file: str,
-                  pre_post_checks: bool = True
+                  pre_post_checks: bool = True,
+                  vdatum_check: bool = False
                   ):
         """
         Top-level transform method.
@@ -141,32 +142,37 @@ class Transformer():
             logger.info(f"Identified as vrbag file: {input_file}")
             self.transform_vrbag(input_file=input_file,
                                  output_file=output_file,
-                                 pre_post_checks=pre_post_checks
+                                 pre_post_checks=pre_post_checks,
+                                 vdatum_check=vdatum_check
                                  )
         elif laz.LAZ(input_file=input_file, invalid_error=False).is_valid:
             logger.info(f"Identified as laz file: {input_file}")
             self.transform_laz(input_file=input_file,
                                output_file=output_file,
-                               pre_post_checks=pre_post_checks
+                               pre_post_checks=pre_post_checks,
+                               vdatum_check=vdatum_check
                                )
         elif npz.NPZ(input_file=input_file, invalid_error=False).is_valid:
             logger.info(f"Identified as npz file: {input_file}")
             self.transform_npz(input_file=input_file,
                                output_file=output_file,
-                               pre_post_checks=pre_post_checks
+                               pre_post_checks=pre_post_checks,
+                               vdatum_check=vdatum_check
                                )
         elif pathlib.Path(input_file).suffix.lower() in self.gdal_extensions():
             logger.info(f"Identified as GDAL-supported raster file: {input_file}")
             self.transform_raster(input_file=input_file,
                                   output_file=output_file,
-                                  pre_post_checks=pre_post_checks
+                                  pre_post_checks=pre_post_checks,
+                                  vdatum_check=vdatum_check
                                   )
         elif pdal_based.PDAL(input_file=input_file,
                              output_file=output_file, invalid_error=False).is_valid:
             logger.info(f"Identified as PDAL-supported file: {input_file}")
             self.transform_pdal(input_file=input_file,
                                 output_file=output_file,
-                                pre_post_checks=pre_post_checks
+                                pre_post_checks=pre_post_checks,
+                                vdatum_check=vdatum_check
                                 )
         # elif vector files
         else:
@@ -178,6 +184,7 @@ class Transformer():
                          y: Union[float, int, list, np.ndarray],
                          z: Union[float, int, list, np.ndarray],
                          always_xy: bool = False,
+                         vdatum_check: bool = True,
                          area_of_interest: Optional[AreaOfInterest] = None,
                          authority: Optional[str] = None,
                          accuracy: Optional[float] = None,
@@ -202,6 +209,9 @@ class Transformer():
             If true, the transform method will accept as input and return as output
             coordinates using the traditional GIS order, that is longitude, latitude
             for geographic CRS and easting, northing for most projected CRS.
+        vdatum_check: bool, default=True
+            If True, a random sample of the transformed data are compared with transformation
+            outcomes produced by Vdatum REST API.
         area_of_interest: :class:`.AreaOfInterest`, optional
             The area of interest to help select the transformation.
         authority: str, optional
@@ -237,7 +247,7 @@ class Transformer():
         """
 
         try:
-            xt, yt, zt = x, y, z
+            xt, yt, zt = x.copy(), y.copy(), z.copy()
             for i in range(len(self.steps)-1):
                 xt, yt, zt = pp.Transformer.from_crs(crs_from=pp.CRS(self.steps[i]),
                                                      crs_to=pp.CRS(self.steps[i+1]),
@@ -250,33 +260,32 @@ class Transformer():
                                                      only_best=only_best
                                                      ).transform(xt, yt, zt)
 
-
-            # if vdatum_check:
-            #     vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_wkt=pp.CRS(self.steps[0]).to_wkt(),
-            #                                                         t_wkt=pp.CRS(self.steps[-1]).to_wkt(),
-            #                                                         n_sample=20,
-            #                                                         s_raster_metadata=None,
-            #                                                         t_raster_metadata=None,
-            #                                                         s_point_samples=...,
-            #                                                         t_point_samples=..,
-            #                                                         tolerance=0.3,
-            #                                                         raster_sampling_band=1,
-            #                                                         region=None,
-            #                                                         pivot_h_crs="EPSG:6318",
-            #                                                         s_h_frame=None,
-            #                                                         s_v_frame=None,
-            #                                                         s_h_zone=None,
-            #                                                         t_h_frame=None,
-            #                                                         t_v_frame=None,
-            #                                                         t_h_zone=None
-            #                                                         )
-            #     if not vdatum_cv:
-            #         success = False
-            #         csv_path = os.path.join(os.path.split(output_file)[0], "vdatum_check.csv")
-            #         vdatum_df.to_csv(csv_path, index=False)
-            #         logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
-            #         print(Style.RESET_ALL)
-
+            if vdatum_check:
+                vdatum_cv, vdatum_df = vdatum_cross_validate(s_wkt=pp.CRS(self.steps[0]).to_wkt(),
+                                                             t_wkt=pp.CRS(self.steps[-1]).to_wkt(),
+                                                             n_sample=20,
+                                                             s_raster_metadata=None,
+                                                             t_raster_metadata=None,
+                                                             s_point_samples=list(zip(x, y, z)),
+                                                             t_point_samples=list(zip(xt, yt, zt)),
+                                                             tolerance=0.3,
+                                                             raster_sampling_band=1,
+                                                             region=None,
+                                                             pivot_h_crs="EPSG:6318",
+                                                             s_h_frame=None,
+                                                             s_v_frame=None,
+                                                             s_h_zone=None,
+                                                             t_h_frame=None,
+                                                             t_v_frame=None,
+                                                             t_h_zone=None
+                                                            )
+                if not vdatum_cv:
+                    csv_path = os.path.join(os.getcwd(), "vdatum_check.csv")
+                    vdatum_df.to_csv(csv_path, index=False)
+                    logger.info(f"{Fore.RED}Vdatum checks on point data failed. "
+                                f"VDatum API outputs stored at: {csv_path}")
+                    print(Style.RESET_ALL)
+                    return None, None, None
 
         except Exception:
             logger.exception("Error while running the point transformation.")
@@ -286,7 +295,8 @@ class Transformer():
     def transform_vrbag(self,
                         input_file: str,
                         output_file: str,
-                        pre_post_checks: bool = True
+                        pre_post_checks: bool = True,
+                        vdatum_check: bool = True
                         ):
         """
         Transform variable resolution BAG file.
@@ -300,6 +310,9 @@ class Transformer():
         pre_post_checks: bool, default=True
             If True, runs a series of validation checks, such as validating the input and output
             CRSs, before and after transformation operation.
+        vdatum_check: bool, default=True
+            If True, a random sample of the transformed data are compared with transformation
+            outcomes produced by Vdatum REST API.
 
         Raises
         -------
@@ -325,7 +338,7 @@ class Transformer():
                 drivers_utils.vrbag_pre_transformation_checks(file_path=input_file,
                                                               source_crs=self.crs_from
                                                               )
-            vrbag.transform(fname=output_file, tf=self, point_transformation=True)
+            vrbag.transform(fname=output_file, tf=self, point_transformation=True, vdatum_check=vdatum_check)
             if pre_post_checks:
                 drivers_utils.vrbag_post_transformation_checks(file_path=output_file,
                                                                target_crs=self.crs_to
@@ -339,7 +352,8 @@ class Transformer():
     def transform_laz(self,
                       input_file: str,
                       output_file: str,
-                      pre_post_checks: bool = True
+                      pre_post_checks: bool = True,
+                      vdatum_check: bool = True
                       ):
         """
         Transform point-cloud LAZ file.
@@ -353,6 +367,9 @@ class Transformer():
         pre_post_checks: bool, default=True
             If True, runs a series of validation checks, such as validating the input and output
             CRSs, before and after transformation operation.
+        vdatum_check: bool, default=True
+            If True, a random sample of the transformed data are compared with transformation
+            outcomes produced by Vdatum REST API.
 
         Raises
         -------
@@ -375,7 +392,7 @@ class Transformer():
                 drivers_utils.laz_pre_transformation_checks(file_path=input_file,
                                                             source_crs=self.crs_from
                                                             )
-            lz.transform(transformer_instance=self)
+            lz.transform(transformer_instance=self, vdatum_check=vdatum_check)
             if pre_post_checks:
                 drivers_utils.laz_post_transformation_checks(file_path=output_file,
                                                              target_crs=self.crs_to
@@ -389,7 +406,8 @@ class Transformer():
     def transform_npz(self,
                       input_file: str,
                       output_file: str,
-                      pre_post_checks: bool = True
+                      pre_post_checks: bool = True,
+                      vdatum_check: bool = True
                       ):
         """
         Transform a numpy npz file.
@@ -403,6 +421,9 @@ class Transformer():
         pre_post_checks: bool, default=True
             If True, runs a series of validation checks, such as validating the input and output
             CRSs, before and after transformation operation.
+        vdatum_check: bool, default=True
+            If True, a random sample of the transformed data are compared with transformation
+            outcomes produced by Vdatum REST API.
 
         Raises
         -------
@@ -425,7 +446,7 @@ class Transformer():
                 drivers_utils.npz_pre_transformation_checks(file_path=input_file,
                                                             source_crs=self.crs_from
                                                             )
-            nz.transform(transformer_instance=self)
+            nz.transform(transformer_instance=self, vdatum_check=vdatum_check)
             if pre_post_checks:
                 drivers_utils.npz_post_transformation_checks(file_path=input_file,
                                                              target_crs=self.crs_to
@@ -439,7 +460,8 @@ class Transformer():
     def transform_pdal(self,
                        input_file: str,
                        output_file: str,
-                       pre_post_checks: bool = True
+                       pre_post_checks: bool = True,
+                       vdatum_check: bool = True
                        ):
         """
         Transform point-cloud data using PDAL.
@@ -453,6 +475,9 @@ class Transformer():
         pre_post_checks: bool, default=True
             If True, runs a series of validation checks, such as validating the input and output
             CRSs, before and after transformation operation.
+        vdatum_check: bool, default=True
+            If True, a random sample of the transformed data are compared with transformation
+            outcomes produced by Vdatum REST API.
 
         Raises
         -------
@@ -465,6 +490,7 @@ class Transformer():
         -----------
         None
         """
+        # TODO implement vdatum_check
         if not input_file.lower().startswith("http") and not os.path.isfile(input_file):
             raise FileNotFoundError(f"The input file not found at {input_file}.")
         try:
@@ -474,7 +500,7 @@ class Transformer():
                 drivers_utils.pdal_pre_transformation_checks(file_path=input_file,
                                                              source_crs=self.crs_from
                                                              )
-            pdl.transform(transformer_instance=self)
+            pdl.transform(transformer_instance=self, vdatum_check=vdatum_check)
             if pre_post_checks:
                 drivers_utils.pdal_post_transformation_checks(file_path=input_file,
                                                               target_crs=self.crs_to
@@ -516,6 +542,9 @@ class Transformer():
         pre_post_checks: bool, default=True
             If True, runs a series of validation checks, such as validating the input and output
             CRSs, before and after transformation operation.
+        vdatum_check: bool, default=True
+            If True, a random sample of the transformed data are compared with transformation
+            outcomes produced by Vdatum REST API.
         warp_kwargs_horizontal: Optional[dict], default=None
             GDAL WarpOptions for horizontal transformation steps. If `None`, will be
             automatically filled. If either source or target CRSs are dynamic,
@@ -619,24 +648,24 @@ class Transformer():
             success = True
             if vdatum_check:
                 output_metadata = raster_metadata(output_file)
-                vdatum_cv, vdatum_df = vdatum_cross_validate_raster(s_wkt=input_metadata["wkt"],
-                                                                    t_wkt=output_metadata["wkt"],
-                                                                    n_sample=20,
-                                                                    s_raster_metadata=input_metadata,
-                                                                    t_raster_metadata=output_metadata,
-                                                                    s_point_samples=None,
-                                                                    t_point_samples=None,
-                                                                    tolerance=0.3,
-                                                                    raster_sampling_band=1,
-                                                                    region=None,
-                                                                    pivot_h_crs="EPSG:6318",
-                                                                    s_h_frame=None,
-                                                                    s_v_frame=None,
-                                                                    s_h_zone=None,
-                                                                    t_h_frame=None,
-                                                                    t_v_frame=None,
-                                                                    t_h_zone=None
-                                                                    )
+                vdatum_cv, vdatum_df = vdatum_cross_validate(s_wkt=input_metadata["wkt"],
+                                                             t_wkt=output_metadata["wkt"],
+                                                             n_sample=20,
+                                                             s_raster_metadata=input_metadata,
+                                                             t_raster_metadata=output_metadata,
+                                                             s_point_samples=None,
+                                                             t_point_samples=None,
+                                                             tolerance=0.3,
+                                                             raster_sampling_band=1,
+                                                             region=None,
+                                                             pivot_h_crs="EPSG:6318",
+                                                             s_h_frame=None,
+                                                             s_v_frame=None,
+                                                             s_h_zone=None,
+                                                             t_h_frame=None,
+                                                             t_v_frame=None,
+                                                             t_h_zone=None
+                                                             )
                 if not vdatum_cv:
                     success = False
                     csv_path = os.path.join(os.path.split(output_file)[0], "vdatum_check.csv")

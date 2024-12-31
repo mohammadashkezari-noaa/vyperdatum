@@ -178,7 +178,7 @@ class PDAL(Driver):
     def is_valid(self):
         return self._is_valid
 
-    def transform(self, transformer_instance) -> None:
+    def transform(self, transformer_instance, vdatum_check: bool) -> None:
         """
         Create a PDAL pipeline to apply CRS transformation on the input data
         according to the `transformer_instance`.

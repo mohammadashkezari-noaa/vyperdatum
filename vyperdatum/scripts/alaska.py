@@ -1,8 +1,8 @@
 import os
+import pyproj as pp
 from vyperdatum.transformer import Transformer
 from vyperdatum.utils.raster_utils import raster_metadata, update_raster_wkt
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
-import pyproj as pp
 
 
 def get_tiff_files(parent_dir: str, extention: str) -> list:
@@ -15,18 +15,21 @@ def get_tiff_files(parent_dir: str, extention: str) -> list:
 
 
 if __name__ == "__main__":
-    parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original"
+    parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\RSD\Alaska\Original"
     files = get_tiff_files(parent_dir, extention=".tif")
-    crs_from1 = "EPSG:6346"
+    crs_from1 = "EPSG:6338+EPSG:5703"
     crs_to1 = "EPSG:9990+NOAA:98"
+
     crs_from2 = "EPSG:9990"
-    crs_to2 = "EPSG:6346"
-    crs_to3 = "EPSG:6346+NOAA:98"
-    for i, input_file in enumerate(files[:1]):
+    crs_to2 = "EPSG:6338"
+
+    crs_to3 = "EPSG:6338+NOAA:98"
+
+    for i, input_file in enumerate(files[-1:]):
         print(f"{i+1}/{len(files)}: {input_file}")
         tf = Transformer(crs_from=crs_from1,
                          crs_to=crs_to1,
-                         steps=[crs_from1, "EPSG:6319", "EPSG:7912", "EPSG:9989", crs_to1]
+                         steps=["EPSG:6338+EPSG:5703", "EPSG:6318+EPSG:5703", "EPSG:6319", "EPSG:7912", "EPSG:9989", "EPSG:9990+NOAA:98"]
                          )
         output_file = input_file.replace("Original", "Manual")
         output_ITRF = output_file + "_ITRF.tif"
@@ -48,25 +51,22 @@ if __name__ == "__main__":
                             )
         update_raster_wkt(output_file, pp.CRS(crs_to3).to_wkt())
         os.remove(output_ITRF)
-        vdatum_cross_validate(s_wkt=pp.CRS(crs_from1).to_wkt(),
-                              t_wkt=pp.CRS(crs_to3).to_wkt(),
-                              n_sample=20,
-                              s_raster_metadata=raster_metadata(input_file),
-                              t_raster_metadata=raster_metadata(output_file),
-                              s_point_samples=None,
-                              t_point_samples=None,
-                              tolerance=0.3,
-                              raster_sampling_band=1,
-                              region="contiguous",
-                              pivot_h_crs="EPSG:6318",
-                              s_h_frame=None,
-                              s_v_frame=None,
-                              s_h_zone=None,
-                              t_h_frame=None,
-                              t_v_frame=None,
-                              t_h_zone=None
-                              )
+        # vdatum_cross_validate(s_wkt=pp.CRS(crs_from1).to_wkt(),
+        #                       t_wkt=pp.CRS(crs_to3).to_wkt(),
+        #                       n_sample=20,
+        #                       s_raster_metadata=raster_metadata(input_file),
+        #                       t_raster_metadata=raster_metadata(output_file),
+        #                       s_point_samples=None,
+        #                       t_point_samples=None,
+        #                       tolerance=0.3,
+        #                       raster_sampling_band=1,
+        #                       region="ak",
+        #                       pivot_h_crs="EPSG:6318",
+        #                       s_h_frame=None,
+        #                       s_v_frame=None,
+        #                       s_h_zone=None,
+        #                       t_h_frame=None,
+        #                       t_v_frame=None,
+        #                       t_h_zone=None
+        #                       )
         print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')
-
-
-

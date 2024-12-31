@@ -1,6 +1,7 @@
 import requests
 import logging
 import time
+import random
 import numpy as np
 import pandas as pd
 from colorama import Fore, Style
@@ -10,7 +11,6 @@ import pyproj as pp
 from tqdm import tqdm
 import difflib
 from vyperdatum.enums import VDATUM
-from vyperdatum.utils.raster_utils import raster_metadata
 
 
 logger = logging.getLogger("root_logger")
@@ -317,24 +317,24 @@ def sample_raster(source_meta: dict,
     return source_samples, target_samples
 
 
-def vdatum_cross_validate_raster(s_wkt: str,
-                                 t_wkt: str,
-                                 n_sample: int,
-                                 s_raster_metadata: Optional[dict],
-                                 t_raster_metadata: Optional[dict],
-                                 s_point_samples: Optional[Union[list, np.ndarray]],
-                                 t_point_samples: Optional[Union[list, np.ndarray]],
-                                 tolerance: float = 0.3,
-                                 raster_sampling_band: int = 1,
-                                 region: Optional[str] = None,
-                                 pivot_h_crs: Optional[str] = None,
-                                 s_h_frame: Optional[str] = None,
-                                 s_v_frame: Optional[str] = None,
-                                 s_h_zone: Optional[str] = None,
-                                 t_h_frame: Optional[str] = None,
-                                 t_v_frame: Optional[str] = None,
-                                 t_h_zone: Optional[str] = None
-                                 ):
+def vdatum_cross_validate(s_wkt: str,
+                          t_wkt: str,
+                          n_sample: int,
+                          s_raster_metadata: Optional[dict],
+                          t_raster_metadata: Optional[dict],
+                          s_point_samples: Optional[Union[list, np.ndarray]],
+                          t_point_samples: Optional[Union[list, np.ndarray]],
+                          tolerance: float = 0.3,
+                          raster_sampling_band: int = 1,
+                          region: Optional[str] = None,
+                          pivot_h_crs: Optional[str] = None,
+                          s_h_frame: Optional[str] = None,
+                          s_v_frame: Optional[str] = None,
+                          s_h_zone: Optional[str] = None,
+                          t_h_frame: Optional[str] = None,
+                          t_v_frame: Optional[str] = None,
+                          t_h_zone: Optional[str] = None
+                          ):
     """
     Randomly sample the source raster points and transform them to the
     target CRS using the vdatum API. Verify if the transformed values are
@@ -437,8 +437,10 @@ def vdatum_cross_validate_raster(s_wkt: str,
                                                        raster_sampling_band,
                                                        pivot_h_crs=pivot_h_crs
                                                        )
-    else:  # comming from point transformations
-        source_samples, target_samples = s_point_samples, t_point_samples
+    else:
+        random_idx = random.sample(range(len(s_point_samples)), n_sample)
+        source_samples = [list(s_point_samples[i]) for i in random_idx]
+        target_samples = [list(t_point_samples[i]) for i in random_idx]
 
     vdatum_points, vdatum_resp = [], []
     cross_df = pd.DataFrame({})

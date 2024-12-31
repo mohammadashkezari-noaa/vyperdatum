@@ -584,6 +584,7 @@ def update_vr_refinements(fname: str,
 
 def transform(fname: str,
               tf,
+              vdatum_check: bool = True,
               point_transformation: bool = True,
               **kwargs
               ):
@@ -604,6 +605,9 @@ def transform(fname: str,
         List of numpy array representing the refinements values to be updated.
     tf: vyperdatum.transformer.Transformer
         Instance of the transformer class.
+    vdatum_check: bool, default=True
+        If True, a random sample of the transformed data are compared with transformation
+        outcomes produced by Vdatum REST API.
     rasters_dir: str
         Absolute path to the directory where the output TIFF files will be stored.
         When raster transformation is chosen, this parameter must be passed

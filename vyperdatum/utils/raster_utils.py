@@ -338,8 +338,8 @@ def warp(input_file: str,
     if isinstance(crs_to, pp.CRS):
         crs_to = crs_to_code_auth(crs_to)
 
-    gdal.Warp(output_file,
-              input_file,
+    gdal.Warp(destNameOrDestDS=output_file,
+              srcDSOrSrcDSTab=input_file,
               dstSRS=crs_to,
               srcSRS=crs_from,
               # xRes=input_metadata["resolution"][0],
@@ -486,3 +486,20 @@ def raster_post_transformation_checks(source_meta: dict,
                            f" ({source_meta['resolution']}) don't match those of the "
                            f"transformed file ({target_meta['resolution']}).")
     return passed
+
+
+def update_raster_wkt(input_file: str, wkt: str) -> None:
+    """
+    Update the WKT of a raster file.
+
+    Parameters
+    -----------
+    input_file: str
+        Absolute path to the input raster file.
+    wkt: str
+        New WKT to update the raster file.
+    """
+    ds = gdal.Open(input_file, gdal.GA_Update)
+    ds.SetProjection(wkt)
+    ds = None
+    return

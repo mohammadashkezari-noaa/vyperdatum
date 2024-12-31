@@ -1,6 +1,7 @@
 import os
 import vyperdatum
 from enum import Enum
+import pyproj as pp
 
 
 class RootEnum(Enum):
@@ -19,7 +20,8 @@ class PROJDB(RootEnum):
     ----------
     FILE_NAME
     """
-    DIR = os.path.join(ASSETS.DIR.value, "datums")
+    # DIR = os.path.join(ASSETS.DIR.value, "datums")
+    DIR = pp.datadir.get_data_dir()
     FILE_NAME = "proj.db"
 
     VIEW_CRS = "crs_view"
