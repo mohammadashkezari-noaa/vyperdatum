@@ -11,18 +11,16 @@ import numpy as np
 from osgeo import gdal, osr, ogr
 from tqdm import tqdm
 from vyperdatum.utils import raster_utils, crs_utils, drivers_utils
-from vyperdatum.utils.raster_utils import raster_metadata
+from vyperdatum.utils.raster_utils import raster_metadata, update_raster_wkt
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
 from vyperdatum.drivers import vrbag, laz, npz, pdal_based
-
+from vyperdatum.pipeline import nwld_ITRF2020_steps
 
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
 
 
 class Transformer():
-    """
-    """
     def __init__(self,
                  crs_from: Union[pp.CRS, int, str],
                  crs_to: Union[pp.CRS, int, str],
@@ -57,8 +55,11 @@ class Transformer():
         self.crs_to = crs_to
         self.steps = steps
         if not self.steps:
-            self.steps = [crs_utils.auth_code(self.crs_from), crs_utils.auth_code(self.crs_to)]
-        if not crs_utils.validate_transform_steps(self.steps):
+            # self.steps = [crs_utils.auth_code(self.crs_from), crs_utils.auth_code(self.crs_to)]
+            h0, v0 = crs_utils.crs_components(self.crs_from)
+            h1, v1 = crs_utils.crs_components(self.crs_to)
+            self.steps = nwld_ITRF2020_steps(h0, v0, h1, v1)
+        if not crs_utils.validate_transform_steps_dict(self.steps):
             raise ValueError("Invalid transformation pipeline.")
         return
 
@@ -577,10 +578,10 @@ class Transformer():
             success = False
             middle_files = []
             pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
-            for i in range(len(self.steps)-1):
-                logger.info(f"Step {i+1}/{len(self.steps)-1}:"
-                            f" {self.steps[i]} --> {self.steps[i+1]}")
-                s_crs, t_crs = pp.CRS(self.steps[i]), pp.CRS(self.steps[i+1])
+            for i in range(len(self.steps)):
+                logger.info(f"Step {i+1}/{len(self.steps)}:"
+                            f" {self.steps[i]['crs_from']} --> {self.steps[i]['crs_to']}")
+                s_crs, t_crs = pp.CRS(self.steps[i]["crs_from"]), pp.CRS(self.steps[i]["crs_to"])
                 i_file = input_file if len(middle_files) == 0 else middle_files[-1]
                 if i == len(self.steps)-2:
                     o_file = output_file
@@ -588,7 +589,8 @@ class Transformer():
                     pif = pathlib.Path(input_file)
                     o_file = pif.with_stem(f"_{i}_{pif.stem}")
                     middle_files.append(o_file)
-                v_shift = crs_utils.vertical_shift(s_crs, t_crs)
+                # v_shift = crs_utils.vertical_shift(s_crs, t_crs)
+                v_shift = self.steps[i]["v_shift"]
                 if v_shift:
                     if warp_kwargs_vertical:
                         warp_kwargs = warp_kwargs_vertical
@@ -616,13 +618,13 @@ class Transformer():
                 raster_tf_block = {"step_id": i,
                                    "input_file": i_file,
                                    "output_file": o_file,
-                                   "crs_from": self.steps[i],
-                                   "crs_to": self.steps[i+1],
+                                   "crs_from": self.steps[i]["crs_from"],
+                                   "crs_to": self.steps[i]["crs_to"],
                                    "vertical_shift": v_shift,
                                    "warp_options": warp_kwargs,
                                    "all_steps": self.steps
                                    }
-                logger.info(f"Running Transformation step {i+1}/{len(self.steps)-1}:"
+                logger.info(f"Running Transformation step {i+1}/{len(self.steps)}:"
                             f"\n{pformat(raster_tf_block, sort_dicts=False)}\n")
                 raster_utils.warp(input_file=i_file,
                                   output_file=o_file,
@@ -645,6 +647,7 @@ class Transformer():
                                           )
                 # raster_utils.add_rat(output_file)
 
+            update_raster_wkt(output_file, self.crs_to.to_wkt())
             success = True
             if vdatum_check:
                 output_metadata = raster_metadata(output_file)
