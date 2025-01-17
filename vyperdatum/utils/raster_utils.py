@@ -6,6 +6,7 @@ import numpy as np
 from typing import Union, Optional
 import pyproj as pp
 from vyperdatum.utils.spatial_utils import overlapping_regions, overlapping_extents
+from vyperdatum.utils.crs_utils import commandline, pipeline_string
 from vyperdatum.enums import VDATUM
 
 
@@ -338,18 +339,27 @@ def warp(input_file: str,
     if isinstance(crs_to, pp.CRS):
         crs_to = crs_to_code_auth(crs_to)
 
-    gdal.Warp(destNameOrDestDS=output_file,
-              srcDSOrSrcDSTab=input_file,
-              dstSRS=crs_to,
-              srcSRS=crs_from,
-              # xRes=input_metadata["resolution"][0],
-              # yRes=abs(input_metadata["resolution"][1]),
-              # outputBounds=input_metadata["extent"],
-              **(warp_kwargs or {})
-              )
-
-    if apply_vertical:
+    if not apply_vertical:
+        gdal.Warp(destNameOrDestDS=output_file,
+                  srcDSOrSrcDSTab=input_file,
+                  dstSRS=crs_to,
+                  srcSRS=crs_from,
+                  # xRes=input_metadata["resolution"][0],
+                  # yRes=abs(input_metadata["resolution"][1]),
+                  # outputBounds=input_metadata["extent"],
+                  **(warp_kwargs or {})
+                  )
+    else:
         # horizontal CRS MUST be identical for both source and target
+
+        pipe = pipeline_string(crs_from=crs_from, crs_to=crs_to)
+        stdout, stderr = commandline(command="gdalwarp",
+                                     args=["-ct", f'{pipe}',
+                                           "-wo", "sample_grid=yes",
+                                           "-wo", "sample_steps=all",
+                                           "-wo", "apply_vertical_shift=yes",
+                                           f'{input_file}', f'{output_file}'])
+
         if isinstance(warp_kwargs.get("srcBands"), list):
             ds_in = gdal.Open(input_file, gdal.GA_ReadOnly)
             ds_out = gdal.Open(output_file, gdal.GA_ReadOnly)
