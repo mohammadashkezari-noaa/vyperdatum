@@ -352,13 +352,24 @@ def warp(input_file: str,
     else:
         # horizontal CRS MUST be identical for both source and target
 
+        #  replace with gdal.Warp() once the nodata fix is online, at PROJ 9.6.0?
         pipe = pipeline_string(crs_from=crs_from, crs_to=crs_to)
         stdout, stderr = commandline(command="gdalwarp",
                                      args=["-ct", f'{pipe}',
                                            "-wo", "sample_grid=yes",
                                            "-wo", "sample_steps=all",
                                            "-wo", "apply_vertical_shift=yes",
+                                           "-tr", f"{input_metadata['resolution'][0]}", f"{abs(input_metadata['resolution'][1])}",
+                                           "-te", f"{input_metadata['extent'][0]}", f"{input_metadata['extent'][1]}", f"{input_metadata['extent'][2]}", f"{input_metadata['extent'][3]}",
                                            f'{input_file}', f'{output_file}'])
+
+        print("ppppppppppppppppppppppp")
+        print(pipe)
+        print(">>>>>>>>>>>>>>>>>>>>>>>")
+        print(stdout)
+        print("eeeeeeeeeeeeeeeeeeeeeee")
+        print(stderr)
+        #######################################################
 
         if isinstance(warp_kwargs.get("srcBands"), list):
             ds_in = gdal.Open(input_file, gdal.GA_ReadOnly)
