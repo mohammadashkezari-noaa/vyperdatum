@@ -271,8 +271,9 @@ if __name__ == "__main__":
 
     crs_from = "EPSG:6347"
     crs_to = "EPSG:6347+NOAA:98"
+
     for i, input_file in enumerate(files[:]):
         print(f"{i+1}/{len(files)}: {input_file}")
-        # transform_template(input_file, crs_from, crs_to)
+        transform_template(input_file, crs_from, crs_to)
 
         # print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')
