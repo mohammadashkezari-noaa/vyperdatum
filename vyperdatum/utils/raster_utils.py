@@ -512,5 +512,6 @@ def update_raster_wkt(input_file: str, wkt: str) -> None:
     """
     ds = gdal.Open(input_file, gdal.GA_Update)
     ds.SetProjection(wkt)
+    ds.FlushCache()
     ds = None
     return

@@ -63,15 +63,3 @@ if __name__ == "__main__":
         os.remove(output_ITRF_NAVD88)
 
         print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')
-
-
-
-
-
-# import pyproj as pp
-# from vyperdatum.utils import crs_utils as cu
-
-
-# print(cu.vertical_shift(pp.CRS("EPSG:32618"), pp.CRS("EPSG:9755")))
-
-

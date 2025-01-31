@@ -1,12 +1,48 @@
 import logging
 import subprocess
 from colorama import Fore, Style
-from typing import Optional
+from typing import Optional, Tuple
 import pyproj as pp
 from pyproj.transformer import TransformerGroup
 
 
 logger = logging.getLogger("root_logger")
+
+
+def crs_components(crs: pp.CRS, raise_no_auth: bool = True) -> Tuple[str, Optional[str]]:
+    """
+    Return CRS horizontal and vertical components string representation
+    in form of code:authority. If the input CRS is horizontal, the vertical
+    component will be None.
+
+    Raises
+    -------
+    ValueError:
+        If either code or authority of the crs (or its sub_crs) can not be determined.
+
+    Returns
+    --------
+    Tuple[str, Optional[str]]:
+        Horizontal and vertical components of crs in form of code:authority
+    """
+    if isinstance(crs, str):
+        crs = pp.CRS(crs)
+    h, v = None, None
+    if crs.is_compound:
+        try:
+            h = ":".join(pp.CRS(crs.sub_crs_list[0]).to_authority())
+        except:
+            h = "UnknownAuthorityCode"
+        try:
+            v = ":".join(pp.CRS(crs.sub_crs_list[1]).to_authority())
+        except:
+            v = "UnknownAuthorityCode"
+    else:
+        ac = crs.to_authority(min_confidence=100)
+        if not ac and raise_no_auth:
+            raise ValueError(f"Unable to produce authority name and code for this crs:\n{crs}")
+        h = ":".join(crs.to_authority())
+    return h, v
 
 
 def auth_code(crs: pp.CRS, raise_no_auth: bool = True) -> Optional[str]:
@@ -282,3 +318,70 @@ def pipeline_string(crs_from: str, crs_to) -> Optional[str]:
             break
         pipe += split
     return pipe
+
+
+def validate_transform_steps_dict(steps: Optional[list[dict]]) -> bool:
+    """
+    Check if all transformation steps can be successfully instantiated by PROJ.
+
+    Parameters
+    ---------
+    steps: Optional[list[dict]]
+        List of dict objects containing crs_from/to in form of `authority:code`
+        representing the CRSs involved in a transformation pipeline.
+
+    Raises
+    -------
+    NotImplementedError:
+        When no transformer is identified.
+
+    Returns
+    --------
+    bool:
+        `False` if either one of the transformation steps fail, otherwise return `True`.
+    """
+    approve = True
+    if not steps or len(steps) < 1:
+        logger.error(f"{Fore.RED}Invalid transformation steps: {steps}")
+        print(Style.RESET_ALL)
+        return False
+    for i in range(len(steps)):
+        try:
+            t1 = pp.Transformer.from_crs(crs_from=steps[i]["crs_from"],
+                                         crs_to=steps[i]["crs_to"],
+                                         allow_ballpark=False,
+                                         only_best=True
+                                         )
+            tg = TransformerGroup(crs_from=steps[i]["crs_from"],
+                                  crs_to=steps[i]["crs_to"],
+                                  allow_ballpark=False,
+                                  )
+            # pyproj doesn't return proj string when there are more than 1 transformers
+            if len(tg.transformers) < 2:
+                if len(tg.transformers) == 0:
+                    err_msg = (f"{Fore.RED}No transformers identified for the following "
+                               f"transformation:\n\tcrs_from: {steps[i]['crs_from']}\n\tcrs_to: {steps[i]['crs_to']}")
+                    logger.error(err_msg)
+                    print(Style.RESET_ALL)
+                    raise NotImplementedError(err_msg)
+                ps = t1.to_proj4()
+                error_hint = ""
+                if not ps:
+                    error_hint = "Null Proj string"
+                elif "+proj=noop" in ps:
+                    error_hint = "+proj=noop"
+                elif "Error" in ps:
+                    error_hint = "Error in Proj string"
+                if error_hint:
+                    logger.error(f"{Fore.RED}Invalid transformation step ({error_hint}): "
+                                 f"{steps[i]['crs_from']} --> {steps[i]['crs_to']}")
+                    print(Style.RESET_ALL)
+                    approve = False
+        except Exception as e:
+            logger.error(f"{Fore.RED}Error in validation of transformation step: "
+                         f"{steps[i]['crs_from']} --> {steps[i]['crs_to']}\n Error Msg: {e}",
+                         stack_info=False, exc_info=False
+                         )
+            print(Style.RESET_ALL)
+            approve = False
+    return approve
