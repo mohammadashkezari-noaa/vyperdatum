@@ -385,3 +385,70 @@ def validate_transform_steps_dict(steps: Optional[list[dict]]) -> bool:
             print(Style.RESET_ALL)
             approve = False
     return approve
+
+
+def commandline(command: str,
+                args: Optional[list[str]] = None) -> tuple[Optional[dict], Optional[str]]:
+    """
+    Spawn a new process to run a commandline utility and capture its output.
+
+    Parameters
+    -----------
+    command: str
+        The name of command (utility) to run. Example: `projinfo`
+    args: Optional[list[str]]
+        Optional arguments.
+
+    Returns
+    --------
+    stdout: Optional[dict], std_err: Optional[str]
+        standard output and error.
+    """
+    try:
+        sout, serr = dict({}), None
+        resp = subprocess.run([command, *args],
+                              stderr=subprocess.PIPE,
+                              stdout=subprocess.PIPE
+                              )
+        sout = resp.stdout.decode() if resp.stdout else None
+        serr = resp.stderr.decode() if resp.stderr else None
+    except Exception as e:
+        logger.exception(str(e))
+        sout, serr = dict({}), None
+    return sout, serr
+
+
+def pipeline_string(crs_from: str, crs_to) -> Optional[str]:
+    """
+    Extract PROJ pipeline string from the output of projinfo utility.
+
+    Parameters
+    -----------
+    crs_from: str
+        Source CRS in auth:code format.
+    crs_to: str
+        Target CRS in auth:code format.
+
+    Returns
+    --------
+    Optional[str]
+    """
+    out, err = commandline(command="projinfo",
+                           args=["-s", crs_from, "-t", crs_to,
+                                 "--spatial-test", "intersects",
+                                 "--hide-ballpark"])
+    if not out:
+        raise ValueError(f"Potential error in getting projinfo output: {err}")
+
+    start = out.find("+proj=pipeline")
+    if start == -1:
+        logger.error("`PROJ string:` not found in the projinfo output")
+        return None
+
+    splits = out[start:].splitlines(keepends=False)
+    pipe = ""
+    for split in splits:
+        if len(split.strip()) == 0:
+            break
+        pipe += split
+    return pipe

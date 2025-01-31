@@ -7,7 +7,16 @@ from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
 import pyproj as pp
 
 
-def transform_NC(input_file):
+def get_tiff_files(parent_dir: str, extention: str) -> list:
+    tiff_files = []
+    for (dirpath, dirnames, filenames) in os.walk(parent_dir):
+        for filename in filenames:
+            if filename.endswith(extention):
+                tiff_files.append(os.sep.join([dirpath, filename]))
+    return tiff_files
+
+
+def transform_NC_0(input_file):
     crs_from1 = "EPSG:6347"
     crs_to1 = "EPSG:9990+NOAA:98"
     crs_from2 = "EPSG:9990"
@@ -56,6 +65,20 @@ def transform_NC(input_file):
                           t_v_frame=None,
                           t_h_zone=None
                           )
+    return
+
+
+def transform_template(input_file, crs_from, crs_to):
+    tf = Transformer(crs_from=crs_from,
+                     crs_to=crs_to
+                     )
+    output_file = input_file.replace("Original", "Manual")
+    tf.transform_raster(input_file=input_file,
+                        output_file=output_file,
+                        overview=False,
+                        pre_post_checks=True,
+                        vdatum_check=True
+                        )
     return
 
 
@@ -234,5 +257,23 @@ def transform_VA_MD_short(input_file):
     return out_file4
 
 
+# if __name__ == "__main__":
+#     crs_from = "EPSG:6347"
+#     crs_to = "EPSG:6347+NOAA:98"
+#     transform_template(input_file=r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\NC1901-TB-C_BLK-01\NC1901-TB-C_BLK-01_US4NC1DF_ellipsoidal_dem.tif",
+#                        crs_from=crs_from, crs_to=crs_to)
+
 if __name__ == "__main__":
-    transform_NC(input_file=r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\NC1901-TB-C_BLK-01\NC1901-TB-C_BLK-01_US4NC1DF_ellipsoidal_dem.tif")
+    # parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\RSD\MD\Original"
+    # files = get_tiff_files(parent_dir, extention=".tif")
+
+    files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\**\*.tif", recursive=True)
+
+    crs_from = "EPSG:6347"
+    crs_to = "EPSG:6347+NOAA:98"
+
+    for i, input_file in enumerate(files[:]):
+        print(f"{i+1}/{len(files)}: {input_file}")
+        transform_template(input_file, crs_from, crs_to)
+
+        # print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')

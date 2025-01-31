@@ -249,9 +249,11 @@ class Transformer():
 
         try:
             xt, yt, zt = x.copy(), y.copy(), z.copy()
-            for i in range(len(self.steps)-1):
-                xt, yt, zt = pp.Transformer.from_crs(crs_from=pp.CRS(self.steps[i]),
-                                                     crs_to=pp.CRS(self.steps[i+1]),
+            for i in range(len(self.steps)):
+                logger.info(f"Step {i+1}/{len(self.steps)}:"
+                            f" {self.steps[i]['crs_from']} --> {self.steps[i]['crs_to']}")
+                xt, yt, zt = pp.Transformer.from_crs(crs_from=pp.CRS(self.steps[i]["crs_from"]),
+                                                     crs_to=pp.CRS(self.steps[i]["crs_to"]),
                                                      always_xy=always_xy,
                                                      area_of_interest=area_of_interest,
                                                      authority=authority,
@@ -262,8 +264,8 @@ class Transformer():
                                                      ).transform(xt, yt, zt)
 
             if vdatum_check:
-                vdatum_cv, vdatum_df = vdatum_cross_validate(s_wkt=pp.CRS(self.steps[0]).to_wkt(),
-                                                             t_wkt=pp.CRS(self.steps[-1]).to_wkt(),
+                vdatum_cv, vdatum_df = vdatum_cross_validate(s_wkt=pp.CRS(self.steps[0]["crs_from"]).to_wkt(),
+                                                             t_wkt=pp.CRS(self.steps[-1]["crs_to"]).to_wkt(),
                                                              n_sample=20,
                                                              s_raster_metadata=None,
                                                              t_raster_metadata=None,
@@ -583,7 +585,7 @@ class Transformer():
                             f" {self.steps[i]['crs_from']} --> {self.steps[i]['crs_to']}")
                 s_crs, t_crs = pp.CRS(self.steps[i]["crs_from"]), pp.CRS(self.steps[i]["crs_to"])
                 i_file = input_file if len(middle_files) == 0 else middle_files[-1]
-                if i == len(self.steps)-2:
+                if i == len(self.steps)-1:
                     o_file = output_file
                 else:
                     pif = pathlib.Path(input_file)
@@ -640,6 +642,7 @@ class Transformer():
                                                                    target_crs=t_crs,
                                                                    vertical_transform=v_shift
                                                                    )
+
             input_metadata = raster_metadata(input_file)
             if overview and input_metadata["driver"].lower() == "gtiff":
                 raster_utils.add_overview(raster_file=output_file,
