@@ -672,10 +672,11 @@ class Transformer():
                                                              t_v_frame=None,
                                                              t_h_zone=None
                                                              )
+                csv_path = os.path.join(os.path.split(output_file)[0],
+                                        os.path.split(output_file)[1].split(".")[0] + "_vdatum_check.csv")
+                vdatum_df.to_csv(csv_path, index=False)
                 if not vdatum_cv:
                     success = False
-                    csv_path = os.path.join(os.path.split(output_file)[0], "vdatum_check.csv")
-                    vdatum_df.to_csv(csv_path, index=False)
                     logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
                     print(Style.RESET_ALL)
         finally:

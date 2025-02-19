@@ -362,13 +362,6 @@ def warp(input_file: str,
                                            "-tr", f"{input_metadata['resolution'][0]}", f"{abs(input_metadata['resolution'][1])}",
                                            "-te", f"{input_metadata['extent'][0]}", f"{input_metadata['extent'][1]}", f"{input_metadata['extent'][2]}", f"{input_metadata['extent'][3]}",
                                            f'{input_file}', f'{output_file}'])
-
-        print("ppppppppppppppppppppppp")
-        print(pipe)
-        print(">>>>>>>>>>>>>>>>>>>>>>>")
-        print(stdout)
-        print("eeeeeeeeeeeeeeeeeeeeeee")
-        print(stderr)
         #######################################################
 
         if isinstance(warp_kwargs.get("srcBands"), list):

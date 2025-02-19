@@ -293,8 +293,11 @@ def sample_raster(source_meta: dict,
             continue
         x, y = index_to_xy(i, j, ds_target.GetGeoTransform())
         target_samples.append([x, y, bar_target[i, j]])
-        source_i = int(bar_source.shape[0] * i / bar_target.shape[0])
-        source_j = int(bar_source.shape[1] * j / bar_target.shape[1])
+
+        source_geot = ds_source.GetGeoTransform()
+        source_i = int((y - source_geot[3]) / source_geot[5])
+        source_j = int((x - source_geot[0]) / source_geot[1])
+
         source_x, source_y = index_to_xy(source_i, source_j, ds_source.GetGeoTransform())
         source_samples.append([source_x, source_y, bar_source[source_i, source_j]])
     ds_source, ds_target = None, None
@@ -403,14 +406,14 @@ def vdatum_cross_validate(s_wkt: str,
     # t_wkt = target_meta["wkt"]
 
     passed = True
-    # if not region:
-    #     region = "contiguous"
-    #     if len(source_meta["overlapping_regions"]) != 1:
-    #         logger.warning("The input is not overlapping with a single region."
-    #                        f" The overlapping regions: ({source_meta['overlapping_regions']})."
-    #                        " The Vdatum API region will be set to 'contiguous'.")
-    #     else:
-    #         region = api_region_alias(source_meta["overlapping_regions"][0])
+    if not region:
+        region = "contiguous"
+        if len(s_raster_metadata["overlapping_regions"]) != 1:
+            logger.warning("The input is not overlapping with a single region."
+                           f" The overlapping regions: ({s_raster_metadata['overlapping_regions']})."
+                           " The Vdatum API region will be set to 'contiguous'.")
+        else:
+            region = api_region_alias(s_raster_metadata["overlapping_regions"][0])
 
     source_crs_h, source_crs_v = wkt_to_crs(s_wkt)
     source_zone_h = wkt_to_utm(s_wkt)
