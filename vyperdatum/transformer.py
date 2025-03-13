@@ -262,7 +262,6 @@ class Transformer():
                                                      force_over=force_over,
                                                      only_best=only_best
                                                      ).transform(xt, yt, zt)
-
             if vdatum_check:
                 vdatum_cv, vdatum_df = vdatum_cross_validate(s_wkt=pp.CRS(self.steps[0]["crs_from"]).to_wkt(),
                                                              t_wkt=pp.CRS(self.steps[-1]["crs_to"]).to_wkt(),

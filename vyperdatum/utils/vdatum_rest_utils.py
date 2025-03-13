@@ -75,6 +75,7 @@ def vdatum_transform_point(s_x, s_y, s_z, region,
                   t_h_frame=t_h_frame, t_v_frame=t_v_frame,
                   t_h_zone=t_h_zone if t_h_zone else "",
                   s_v_goid=s_v_goid, t_v_goid=t_v_goid)
+    # logger.debug(f"Parameter used to call Vdatum API:\n{params}\n")
     try:
         resp = requests.get(url, params=params, timeout=200).json()
         time.sleep(0.5)

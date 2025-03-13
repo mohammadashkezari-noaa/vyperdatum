@@ -353,7 +353,7 @@ def warp(input_file: str,
         # horizontal CRS MUST be identical for both source and target
 
         #  replace with gdal.Warp() once the nodata fix is online, at PROJ 9.6.0?
-        pipe = pipeline_string(crs_from=crs_from, crs_to=crs_to)
+        pipe = pipeline_string(crs_from=crs_from, crs_to=crs_to, input_metadata=input_metadata)
         stdout, stderr = commandline(command="gdalwarp",
                                      args=["-ct", f'{pipe}',
                                            "-wo", "sample_grid=yes",

@@ -418,7 +418,7 @@ def commandline(command: str,
     return sout, serr
 
 
-def pipeline_string(crs_from: str, crs_to) -> Optional[str]:
+def pipeline_string(crs_from: str, crs_to, input_metadata) -> Optional[str]:
     """
     Extract PROJ pipeline string from the output of projinfo utility.
 
@@ -428,14 +428,18 @@ def pipeline_string(crs_from: str, crs_to) -> Optional[str]:
         Source CRS in auth:code format.
     crs_to: str
         Target CRS in auth:code format.
+    input_metadata: dict
+        Input raster metadata object.
 
     Returns
     --------
     Optional[str]
     """
+    # bbox = [str(v) for v in input_metadata["geo_extent"]]
     out, err = commandline(command="projinfo",
                            args=["-s", crs_from, "-t", crs_to,
                                  "--spatial-test", "intersects",
+                                #  "--bbox", ",".join(bbox),
                                  "--hide-ballpark"])
     if not out:
         raise ValueError(f"Potential error in getting projinfo output: {err}")
