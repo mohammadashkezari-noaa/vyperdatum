@@ -45,7 +45,7 @@ def transform_with_vyperdatum_navd88(input_file, zone):
                 ]
     tf = Transformer(crs_from=crs_from,
                      crs_to=crs_to,
-                     steps=steps
+                    #  steps=steps
                      )
     output_file = input_file.replace("Original", "Manual")
     tf.transform_raster(input_file=input_file,
@@ -113,7 +113,7 @@ def transform_with_vyperdatum_igld85(input_file, zone):
 
     tf = Transformer(crs_from=crs_from,
                      crs_to=crs_to,
-                     steps=steps
+                    #  steps=steps
                      )
     output_file = input_file.replace("Original", "Manual")
     tf.transform_raster(input_file=input_file,
@@ -225,6 +225,8 @@ if __name__ == "__main__":
     # files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBD\Original\NAVD88\**\*.tif", recursive=True)
     files = glob.glob(r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBD\Original\IGLD85\**\*.tif", recursive=True)
 
+    files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBD\Original\NAVD88\17N\usace2018_niagara_dem_Job1145328\usace2018_niagara_dem_J1145328_000_001.tif"]
+
     for i, input_file in enumerate(files[:]):
         try:
             print(f"{i+1}/{len(files)}: {input_file}")
@@ -236,8 +238,8 @@ if __name__ == "__main__":
                 zone = "17N"
             elif input_file.find(r"\18N") != -1:
                 zone = "18N"
-            # transform_with_vyperdatum_navd88(input_file, zone)
-            transform_with_vyperdatum_igld85(input_file, zone)
+            transform_with_vyperdatum_navd88(input_file, zone)
+            # transform_with_vyperdatum_igld85(input_file, zone)
 
             print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')
         except Exception as e:

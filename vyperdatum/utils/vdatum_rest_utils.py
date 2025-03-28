@@ -87,7 +87,7 @@ def vdatum_transform_point(s_x, s_y, s_z, region,
             float(resp.get("t_z", np.nan))), resp
 
 
-def api_region_alias(region: str):
+def api_region_alias(vdatum_regions: list[str]):
     """
     Vdatum REST api uses different region names compared to those
     listed in the vdatum grids directory. This function expects to
@@ -97,24 +97,30 @@ def api_region_alias(region: str):
 
     Parameters
     ------------
-    region: str
+    region: list[str]
          Region name according to the vdatum grids directory.
 
     Returns
     ------------
     str
     """
-    api_region = "contiguous"
-    if region.startswith("AK"):
-        api_region = "ak"
-    elif region.startswith("MD"):
-        api_region = "chesapeak_delaware"
-    elif region.startswith("TX"):
-        api_region = "wgom"
-    elif region.startswith("WA") or region.startswith("OR") or region.startswith("WC"):
-        api_region = "westcoast"
-    elif region.startswith("PRVI"):
-        api_region = "prvi"
+    api_region = set()
+    for region in vdatum_regions:
+        if region.startswith("AK"):
+            api_region.add("ak")
+        elif region.startswith("MD"):
+            api_region.add("chesapeak_delaware")
+        elif region.startswith("TX"):
+            api_region.add("wgom")
+        elif region.startswith("WA") or region.startswith("OR") or region.startswith("WC"):
+            api_region.add("westcoast")
+        elif region.startswith("PRVI"):
+            api_region.add("prvi")
+
+    if len(api_region) != 1:
+        api_region = "contiguous"
+    else:    
+        api_region = api_region.pop()
     # Note: not all regions are covered here. For example, I do'nt know what is the Hawaii
     # region name is in vdatum grid directory (or as, sgi, spi, sli, gcnmi, wgom, ...).
     # looks like `westcoast` and `chesapeak_delaware` are not considered as part of `contiguous`?.
@@ -177,10 +183,6 @@ def api_crs_aliases(wkt: str) -> tuple[str, str]:
     and returns horizontal and vertical CRS names that are consumable
     by the vdatum REST api.
 
-    Raises
-    ------------
-    ValueError
-         When the standard CRS name can't be matched with any Vdatum API CRS names.
 
     Parameters
     ------------
@@ -196,12 +198,12 @@ def api_crs_aliases(wkt: str) -> tuple[str, str]:
     h_crs = h_crs.split("/")[0].strip()
     h_matches = difflib.get_close_matches(h_crs, VDATUM.H_FRAMES.value)
     if len(h_matches) == 0:
-        raise ValueError(f"No Vdatum horizontal CRS name matched with '{h_crs}'")
+        logger.error(f"No Vdatum horizontal CRS name matched with '{h_crs}'")
     h_crs = h_matches[0]
 
     v_crs_black = ["HRD"]
     if v_crs and v_crs.split()[0].upper().strip() in v_crs_black:
-        raise ValueError(f"The raster's vertical CRS is '{v_crs}' which is not covered by Vdatum.")
+        logger.error(f"The raster's vertical CRS is '{v_crs}' which is not covered by Vdatum.")
 
     if not v_crs:
         v_crs = h_crs
@@ -211,7 +213,7 @@ def api_crs_aliases(wkt: str) -> tuple[str, str]:
             v_matches = difflib.get_close_matches(v_crs.split()[0].strip(), VDATUM.V_FRAMES.value)
         if len(v_matches) == 0:
             v_matches = difflib.get_close_matches(v_crs.split()[0].strip(), VDATUM.V_FRAMES.value)
-            raise ValueError(f"No Vdatum vertical CRS name matched with '{v_crs}'")
+            logger.error(f"No Vdatum vertical CRS name matched with '{v_crs}'")
         v_crs = v_matches[0]
     return h_crs, v_crs
 
@@ -408,13 +410,12 @@ def vdatum_cross_validate(s_wkt: str,
 
     passed = True
     if not region:
-        region = "contiguous"
-        if len(s_raster_metadata["overlapping_regions"]) != 1:
-            logger.warning("The input is not overlapping with a single region."
-                           f" The overlapping regions: ({s_raster_metadata['overlapping_regions']})."
-                           " The Vdatum API region will be set to 'contiguous'.")
-        else:
-            region = api_region_alias(s_raster_metadata["overlapping_regions"][0])
+        region = api_region_alias(s_raster_metadata["overlapping_regions"])
+        # if len(s_raster_metadata["overlapping_regions"]) != 1:
+        #     logger.warning("The input is not overlapping with a single region."
+        #                    f" The overlapping regions: ({s_raster_metadata['overlapping_regions']})."
+        #                    " The Vdatum API region will be set to 'contiguous'.")
+            
 
     source_crs_h, source_crs_v = wkt_to_crs(s_wkt)
     source_zone_h = wkt_to_utm(s_wkt)

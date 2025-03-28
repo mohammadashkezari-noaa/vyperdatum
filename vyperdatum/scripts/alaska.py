@@ -99,8 +99,9 @@ if __name__ == "__main__":
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\RSD\Alaska\Original"
     files = get_tiff_files(parent_dir, extention=".tif")
 
-
-    crs_from = "EPSG:6338+NOAA:5703"
+    files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\RSD\Alaska\Original\ngs_dem_revillagigedo_ak_Job1105762\ngs_dem_revillagigedo_ak_J1105762_002_002.tif"]
+    
+    crs_from = "EPSG:6338+EPSG:5703"
     # crs_to = "EPSG:6338+NOAA:98"
     crs_to = "EPSG:6338+NOAA:55" # to match Vdatum
     steps = None
@@ -110,11 +111,11 @@ if __name__ == "__main__":
         print(f"{i+1}/{len(files)}: {input_file}")
         output_file = input_file.replace("Original", "Manual")
 
-        # transform_with_vyperdatum(input_file, output_file, crs_from, crs_to, steps)
+        transform_with_vyperdatum(input_file, output_file, crs_from, crs_to, steps)
 
-        Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
-        transform_with_concat_pipe(input_file, output_file)
-        update_raster_wkt(output_file, pp.CRS(crs_to).to_wkt())
+        # Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
+        # transform_with_concat_pipe(input_file, output_file)
+        # update_raster_wkt(output_file, pp.CRS(crs_to).to_wkt())
 
         # passed, cross_df = vdatum_cross_validate(s_wkt=pp.CRS(crs_from).to_wkt(),
         #                                          t_wkt=pp.CRS(crs_to).to_wkt(),
