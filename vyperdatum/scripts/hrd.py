@@ -47,12 +47,16 @@ if __name__ == "__main__":
 
     # files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\NC\Original\NC1903-TB-C_BLK-07\NC1903-TB-C_BLK-07_US4NC1FG_ellipsoidal_dem.tif"]
 
-    for i, input_file in enumerate(files[1:2]):
+    for i, input_file in enumerate(files[:1]):
         try:
             print(f"{i+1}/{len(files)}: {input_file}")
             output_file = input_file.replace("Original", "Manual")
             transform_with_vyperdatum(input_file, output_file, crs_from, crs_to)
             print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')
+
+            meta = raster_metadata(output_file)
+            print("...........................")
+            print(meta["Vyperdatum_Metadata"])
         except Exception as e:
                 efile = open(Path(output_file).parent.absolute()/Path(f"{os.path.split(input_file)[1]}_error.txt"), "w")
                 efile.write(str(e))

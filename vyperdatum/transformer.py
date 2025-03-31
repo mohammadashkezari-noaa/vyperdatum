@@ -1,10 +1,12 @@
 import os
 import pathlib
 import shutil
+import io
+import sys
 import logging
 from pathlib import Path
 import re
-from pprint import pformat
+import json
 from typing import Union, Optional
 from colorama import Fore, Style
 import pyproj as pp
@@ -516,184 +518,12 @@ class Transformer():
                 os.remove(output_file)
         return
 
-    def transform_raster_no_concat(self,
-                         input_file: str,
-                         output_file: str,
-                         overview: bool = False,
-                         pre_post_checks: bool = True,
-                         vdatum_check: bool = True,
-                         warp_kwargs_horizontal: Optional[dict] = None,
-                         warp_kwargs_vertical: Optional[dict] = None
-                         ) -> bool:
-        """
-        Transform the gdal-supported input rater file (`input_file`) and store the
-        transformed file on the local disk (`output_file`).
-
-        Raises
-        -------
-        FileNotFoundError:
-            If the input raster file is not found.
-        NotImplementedError:
-            If the input file is not supported by gdal.
-
-        Parameters
-        -----------
-        input_file: str
-            Path to the input raster file (gdal supported).
-        output_file: str
-            Path to the transformed raster file.
-        overview: bool, default=True
-            If True, overview bands are added to the output raster file (only GTiff support).
-        pre_post_checks: bool, default=True
-            If True, runs a series of validation checks, such as validating the input and output
-            CRSs, before and after transformation operation.
-        vdatum_check: bool, default=True
-            If True, a random sample of the transformed data are compared with transformation
-            outcomes produced by Vdatum REST API.
-        warp_kwargs_horizontal: Optional[dict], default=None
-            GDAL WarpOptions for horizontal transformation steps. If `None`, will be
-            automatically filled. If either source or target CRSs are dynamic,
-            CRS epoch will also get included.
-        warp_kwargs_vertical: Optional[dict], default=None
-            GDAL WarpOptions for vertical transformation steps. If `None`, will be
-            automatically filled. If either source or target CRSs are dynamic, CRS epoch
-            will also get included. Below is the default WarpOptions for vertical steps.
-            Note that the default WarpOptions assumes that only
-            band 1 of the raster file should be affected by the vertical shift (see
-            "srcBands" and "dstBands").
-            {
-             "outputType": gdal.gdalconst.GDT_Float32,
-             "srcBands": [1],
-             "dstBands": [1],
-             "warpOptions": ["APPLY_VERTICAL_SHIFT=YES",
-                             "SAMPLE_GRID=YES",
-                             "SAMPLE_STEPS=ALL"
-                             ],
-             "errorThreshold": 0,
-            }
-
-        Returns
-        --------
-        bool:
-            True if successful, otherwise False.
-        """
-        self._validate_input_file(input_file)
-        try:
-            success = False
-            middle_files = []
-            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
-            for i in range(len(self.steps)):
-                logger.info(f"Step {i+1}/{len(self.steps)}:"
-                            f" {self.steps[i]['crs_from']} --> {self.steps[i]['crs_to']}")
-                s_crs, t_crs = pp.CRS(self.steps[i]["crs_from"]), pp.CRS(self.steps[i]["crs_to"])
-                i_file = input_file if len(middle_files) == 0 else middle_files[-1]
-                if i == len(self.steps)-1:
-                    o_file = output_file
-                else:
-                    pif = pathlib.Path(input_file)
-                    o_file = pif.with_stem(f"_{i}_{pif.stem}")
-                    middle_files.append(o_file)
-                # v_shift = crs_utils.vertical_shift(s_crs, t_crs)
-                v_shift = self.steps[i]["v_shift"]
-                if v_shift:
-                    if warp_kwargs_vertical:
-                        warp_kwargs = warp_kwargs_vertical
-                    else:
-                        warp_kwargs = {
-                                       "outputType": gdal.gdalconst.GDT_Float32,
-                                       "srcBands": [1],
-                                       "dstBands": [1],
-                                       "warpOptions": ["APPLY_VERTICAL_SHIFT=YES",
-                                                       "SAMPLE_GRID=YES",
-                                                       "SAMPLE_STEPS=ALL"
-                                                       ],
-                                       "errorThreshold": 0,
-                                       }
-                        warp_kwargs = crs_utils.add_epoch_option(s_crs, t_crs, warp_kwargs)
-                else:
-                    if warp_kwargs_horizontal:
-                        warp_kwargs = warp_kwargs_horizontal
-                    else:
-                        warp_kwargs = {}
-                        warp_kwargs = crs_utils.add_epoch_option(s_crs, t_crs, warp_kwargs)
-                if pre_post_checks:
-                    raster_utils.raster_pre_transformation_checks(source_meta=raster_metadata(i_file),
-                                                                  source_crs=s_crs)
-                raster_tf_block = {"step_id": i,
-                                   "input_file": i_file,
-                                   "output_file": o_file,
-                                   "crs_from": self.steps[i]["crs_from"],
-                                   "crs_to": self.steps[i]["crs_to"],
-                                   "vertical_shift": v_shift,
-                                   "warp_options": warp_kwargs,
-                                   "all_steps": self.steps
-                                   }
-                logger.info(f"Running Transformation step {i+1}/{len(self.steps)}:"
-                            f"\n{pformat(raster_tf_block, sort_dicts=False)}\n")
-                raster_utils.warp(input_file=i_file,
-                                  output_file=o_file,
-                                  apply_vertical=v_shift,
-                                  crs_from=s_crs,
-                                  crs_to=t_crs,
-                                  input_metadata=raster_metadata(i_file),
-                                  warp_kwargs=warp_kwargs
-                                  )
-                if pre_post_checks:
-                    raster_utils.raster_post_transformation_checks(source_meta=raster_metadata(i_file),
-                                                                   target_meta=raster_metadata(o_file),
-                                                                   target_crs=t_crs,
-                                                                   vertical_transform=v_shift
-                                                                   )
-
-            input_metadata = raster_metadata(input_file)
-            if overview and input_metadata["driver"].lower() == "gtiff":
-                raster_utils.add_overview(raster_file=output_file,
-                                          compression=input_metadata["compression"]
-                                          )
-                # raster_utils.add_rat(output_file)
-
-            update_raster_wkt(output_file, self.crs_to.to_wkt())
-            success = True
-            if vdatum_check:
-                output_metadata = raster_metadata(output_file)
-                vdatum_cv, vdatum_df = vdatum_cross_validate(s_wkt=input_metadata["wkt"],
-                                                             t_wkt=output_metadata["wkt"],
-                                                             n_sample=20,
-                                                             s_raster_metadata=input_metadata,
-                                                             t_raster_metadata=output_metadata,
-                                                             s_point_samples=None,
-                                                             t_point_samples=None,
-                                                             tolerance=0.3,
-                                                             raster_sampling_band=1,
-                                                             region=None,
-                                                             pivot_h_crs="EPSG:6318",
-                                                             s_h_frame=None,
-                                                             s_v_frame=None,
-                                                             s_h_zone=None,
-                                                             t_h_frame=None,
-                                                             t_v_frame=None,
-                                                             t_h_zone=None
-                                                             )
-                csv_path = os.path.join(os.path.split(output_file)[0],
-                                        os.path.split(output_file)[1].split(".")[0] + "_vdatum_check.csv")
-                vdatum_df.to_csv(csv_path, index=False)
-                if not vdatum_cv:
-                    success = False
-                    logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
-                    print(Style.RESET_ALL)
-        finally:
-            for mf in middle_files:
-                os.remove(mf)
-            return success
-
     def transform_raster(self,
                          input_file: str,
                          output_file: str,
                          overview: bool = False,
                          pre_post_checks: bool = True,
                          vdatum_check: bool = True,
-                         warp_kwargs_horizontal: Optional[dict] = None,
-                         warp_kwargs_vertical: Optional[dict] = None
                          ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
@@ -720,27 +550,7 @@ class Transformer():
         vdatum_check: bool, default=True
             If True, a random sample of the transformed data are compared with transformation
             outcomes produced by Vdatum REST API.
-        warp_kwargs_horizontal: Optional[dict], default=None
-            GDAL WarpOptions for horizontal transformation steps. If `None`, will be
-            automatically filled. If either source or target CRSs are dynamic,
-            CRS epoch will also get included.
-        warp_kwargs_vertical: Optional[dict], default=None
-            GDAL WarpOptions for vertical transformation steps. If `None`, will be
-            automatically filled. If either source or target CRSs are dynamic, CRS epoch
-            will also get included. Below is the default WarpOptions for vertical steps.
-            Note that the default WarpOptions assumes that only
-            band 1 of the raster file should be affected by the vertical shift (see
-            "srcBands" and "dstBands").
-            {
-             "outputType": gdal.gdalconst.GDT_Float32,
-             "srcBands": [1],
-             "dstBands": [1],
-             "warpOptions": ["APPLY_VERTICAL_SHIFT=YES",
-                             "SAMPLE_GRID=YES",
-                             "SAMPLE_STEPS=ALL"
-                             ],
-             "errorThreshold": 0,
-            }
+
 
         Returns
         --------
@@ -770,30 +580,47 @@ class Transformer():
             with gdal.Open(input_file, gdal.GA_ReadOnly) as input_ds:
                 geotransform = input_ds.GetGeoTransform()
                 xres, yres = geotransform[1], geotransform[5]
-            ds = gdal.Warp(output_vrt, input_file, format="vrt", outputType=gdal.gdalconst.GDT_Float32,
-                           warpOptions=["APPLY_VERTICAL_SHIFT=YES", "SAMPLE_GRID=YES", "SAMPLE_STEPS=ALL"],
+            ds = gdal.Warp(output_vrt, input_file, format="vrt",
+                           outputType=gdal.gdalconst.GDT_Float32,
+                           warpOptions=["APPLY_VERTICAL_SHIFT=YES",
+                                        "SAMPLE_GRID=YES",
+                                        "SAMPLE_STEPS=ALL"],
                            errorThreshold=0,
                            xRes=xres,
                            yRes=yres,
-                           # targetAlignedPixels=True,
                            outputBounds=input_metadata["extent"],
                            coordinateOperation=pipe
                            )
-            pipe = re.sub(r'\s{2,}', ' ', pipe).strip()
-            ds.SetMetadataItem('TIFFTAG_IMAGEDESCRIPTION', pipe)
-            output_ds = gdal.Translate(output_file, ds, format="GTiff", outputType=gdal.GDT_Float32, creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
+            pipe = re.sub(r"\s{2,}", " ", pipe).strip()
+            to_wkt = self.crs_to.to_wkt()
+            to_wkt = re.sub(r"\s{2,}", " ", to_wkt).strip()
+            buffer = io.StringIO()
+            sys.stdout = buffer
+            pp.show_versions()
+            sys.stdout = sys.__stdout__
+
+            vyper_meta = {"steps": self.steps,
+                          "proj_pipeline": pipe,
+                          "wkt": to_wkt,
+                          "pyproj_versions": buffer.getvalue(),
+                          }
+            vyper_meta = json.dumps(vyper_meta)
+            ds.SetMetadataItem("Vyperdatum_Metadata", vyper_meta)
+            output_ds = gdal.Translate(output_file, ds, format="GTiff",
+                                       outputType=gdal.GDT_Float32,
+                                       creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
             output_ds = None
-            update_raster_wkt(output_file, self.crs_to.to_wkt())
-            input_metadata, output_metadata = raster_metadata(input_file), raster_metadata(output_file)            
+            update_raster_wkt(output_file, to_wkt)
+            input_metadata = raster_metadata(input_file)
+            output_metadata = raster_metadata(output_file)
             if pre_post_checks:
-                raster_utils.raster_post_transformation_checks(source_meta=raster_metadata(input_file),
-                                                               target_meta=raster_metadata(output_file),
+                raster_utils.raster_post_transformation_checks(source_meta=input_metadata,
+                                                               target_meta=output_metadata,
                                                                target_crs=self.crs_to,
                                                                vertical_transform=v_shift
                                                                )
             success = True
             if vdatum_check:
-                output_metadata = raster_metadata(output_file)
                 vdatum_cv, vdatum_df = vdatum_cross_validate(s_wkt=input_metadata["wkt"],
                                                              t_wkt=output_metadata["wkt"],
                                                              n_sample=20,
