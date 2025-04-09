@@ -1,6 +1,7 @@
 import os
 import pathlib
 import shutil
+from importlib.metadata import version
 import io
 import sys
 import logging
@@ -43,12 +44,17 @@ class Transformer():
             Projection of input data.
         crs_to: pyproj.crs.CRS or input used to create one
             Projection of output data.
-        steps: Optional[list[str]]
-            A list of CRSs in form of `authority:code`, representing the transformation steps
-            connecting the `crs_from` to `crs_to`. When None is passed, vyperdatum will attempt
-            to conduct a direct transformation from `crs_from` to `crs_to`, without any
-            intermediate CRSs.
-            Example: ['EPSG:6348', 'EPSG:6319', 'NOAA:8322', 'EPSG:6348+NOAA:5320']
+        steps: Optional[list[dict]]
+            A list of dicts containing source and target CRSs in form of `authority:code`,
+            and a boolean key to signify if the step impose a vertical shift. This parameter
+            represents the overall transformation steps connecting the `crs_from` to `crs_to`.
+            When `None` is passed, vyperdatum will attempt to automatically determine the steps
+            from `crs_from` to `crs_to`.
+            Example:
+            steps = [{"crs_from": "EPSG:6346", "crs_to": "EPSG:6318", "v_shift": False},
+                     {"crs_from": "EPSG:6319", "crs_to": "EPSG:6318+NOAA:98", "v_shift": True},
+                     {"crs_from": "EPSG:6318", "crs_to": "EPSG:6346", "v_shift": False}
+                    ]
         """
 
         if not isinstance(crs_from, pp.CRS):
@@ -67,6 +73,42 @@ class Transformer():
         if not crs_utils.validate_transform_steps_dict(self.steps):
             raise ValueError("Invalid transformation pipeline.")
         return
+
+    @classmethod
+    def from_GTiff_raster(cls,
+                          input_file: str,
+                          crs_to: Union[pp.CRS, int, str],
+                          steps: Optional[list[dict]]) -> "Transformer":
+        """
+        Create a Transformer instance from a GeoTiff raster file.
+
+        Raises
+        ----------
+        FileNotFoundError
+            If the input file is not found.
+        ValueError
+            If the input raster does not have the `Vyperdatum_Metadata` metadata tag.
+
+        Parameters
+        ----------
+        input_file: str
+            Path to the input raster file.
+        crs_to: pyproj.crs.CRS or input used to create one
+            Projection of output data.
+        steps: Optional[list[dict]]
+            A list of dicts containing source and target CRSs in form of `authority:code`,
+            and a boolean key to signify if the step impose a vertical shift. This parameter
+            represents the overall transformation steps connecting the `crs_from` to `crs_to`.
+            When `None` is passed, vyperdatum will attempt to automatically determine the steps.        
+        """
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(f"The input file not found at {input_file}.")
+        meta = raster_utils.raster_metadata(input_file)
+        if "Vyperdatum_Metadata" not in meta:
+            raise ValueError("The input raster file does not have the `Vyperdatum_Metadata` tag.")
+        vyperdatum_metadata = json.loads(meta["Vyperdatum_Metadata"])
+        crs_from = pp.CRS(vyperdatum_metadata["wkt"])
+        return cls(crs_from=crs_from, crs_to=crs_to, steps=steps)
 
     @staticmethod
     def gdal_extensions() -> list[str]:
@@ -598,14 +640,23 @@ class Transformer():
             sys.stdout = buffer
             pp.show_versions()
             sys.stdout = sys.__stdout__
+            pyproj_versions = re.sub(r"\s{2,}", " ", buffer.getvalue()).strip()
+            crs_h, crs_v = crs_utils.crs_components(self.crs_to, raise_no_auth=False)
 
-            vyper_meta = {"steps": self.steps,
+            vyper_meta = {"description": ("This file is the output of a transformation pipeline "
+                                          f"executed using Vyperdatum ({version('vyperdatum')})"
+                                          " software by NOAA's OCS, NBS branch."),
+                          "vyperdatum_version": version("vyperdatum"),
+                          "steps": self.steps,
                           "proj_pipeline": pipe,
                           "wkt": to_wkt,
-                          "pyproj_versions": buffer.getvalue(),
+                          "crs_horizontal": crs_h if crs_h else "",
+                          "crs_vertical": crs_v if crs_v else "",
+                          "pyproj_versions": pyproj_versions,
                           }
             vyper_meta = json.dumps(vyper_meta)
             ds.SetMetadataItem("Vyperdatum_Metadata", vyper_meta)
+
             output_ds = gdal.Translate(output_file, ds, format="GTiff",
                                        outputType=gdal.GDT_Float32,
                                        creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
