@@ -21,7 +21,12 @@ class PROJDB(RootEnum):
     FILE_NAME
     """
     # DIR = os.path.join(ASSETS.DIR.value, "datums")
-    DIR = pp.datadir.get_data_dir()
+    # DIR = pp.datadir.get_data_dir()
+    DIR = os.environ.get("VYPER_GRIDS", None)
+    if DIR is None:
+        raise EnvironmentError("VYPER_GRIDS environment variable is not set. "
+                               "Please set it to the directory where the proj database "
+                               "and the grid file are located.")
     FILE_NAME = "proj.db"
 
     VIEW_CRS = "crs_view"
@@ -58,4 +63,7 @@ class VRBAG(RootEnum):
 class DATUM_DOI(RootEnum):
     REGIONAL = {"url": "https://zenodo.org/records/14201516/files/regional.zip?download=1",
                 "dir_name": "regional"
+                }
+    NWLD = {"url": "https://zenodo.org/records/15184045/files/proj.zip?download=1",
+                "dir_name": "proj"
                 }

@@ -34,4 +34,3 @@ if __name__ == "__main__":
                             vdatum_check=True
                             )                    
         print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')
-
