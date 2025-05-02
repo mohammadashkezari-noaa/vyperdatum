@@ -65,5 +65,5 @@ class DATUM_DOI(RootEnum):
                 "dir_name": "regional"
                 }
     NWLD = {"url": "https://zenodo.org/records/15184045/files/proj.zip?download=1",
-                "dir_name": "proj"
-                }
+            "dir_name": "proj"
+            }

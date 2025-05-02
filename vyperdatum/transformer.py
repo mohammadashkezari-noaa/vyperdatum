@@ -18,7 +18,7 @@ from tqdm import tqdm
 from vyperdatum.utils import raster_utils, crs_utils, drivers_utils
 from vyperdatum.utils.raster_utils import raster_metadata, update_raster_wkt
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
-from vyperdatum.drivers import vrbag, laz, npz, pdal_based
+from vyperdatum.drivers import vrbag, laz, npz, pdal_based, gparq
 from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
 
 logger = logging.getLogger("root_logger")
@@ -193,6 +193,13 @@ class Transformer():
                                  pre_post_checks=pre_post_checks,
                                  vdatum_check=vdatum_check
                                  )
+        elif gparq.GeoParquet(input_file=input_file, invalid_error=False).is_valid:
+            logger.info(f"Identified as geoparquet file: {input_file}")
+            self.transform_geoparquet(input_file=input_file,
+                                      output_file=output_file,
+                                      pre_post_checks=pre_post_checks,
+                                      vdatum_check=vdatum_check
+                                      )
         elif laz.LAZ(input_file=input_file, invalid_error=False).is_valid:
             logger.info(f"Identified as laz file: {input_file}")
             self.transform_laz(input_file=input_file,
@@ -448,6 +455,56 @@ class Transformer():
                                                              )
         except Exception as e:
             logger.exception(f"Exception in `transform_laz()`: {str(e)}")
+            if os.path.isfile(output_file):
+                os.remove(output_file)
+        return
+
+    def transform_geoparquet(self,
+                             input_file: str,
+                             output_file: str,
+                             pre_post_checks: bool = True,
+                             vdatum_check: bool = True
+                             ):
+        """
+        Transform a geoparquet point file.
+
+        Parameters
+        -----------
+        input_file: str
+            Path to the input geoparquet file.
+        output_file: str
+            Path to the output transformed file.
+        pre_post_checks: bool, default=True
+            If True, runs a series of validation checks, such as validating the input and output
+            CRSs, before and after transformation operation.
+        vdatum_check: bool, default=True
+            If True, a random sample of the transformed data are compared with transformation
+            outcomes produced by Vdatum REST API.
+
+        Raises
+        -------
+        FileNotFoundError:
+            If the input file is not found.
+        TypeError
+            If the passed file is not valid.
+
+        Returns
+        -----------
+        None
+        """
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(f"The input file not found at {input_file}.")
+        try:
+            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
+            gp = gparq.GeoParquet(input_file=input_file)
+
+            gp.transform(transformer_instance=self,
+                         output_file=output_file,
+                         pre_post_checks=pre_post_checks,
+                         vdatum_check=vdatum_check)
+
+        except Exception as e:
+            logger.exception(f"Exception in `transform_geoparquet()`: {str(e)}")
             if os.path.isfile(output_file):
                 os.remove(output_file)
         return

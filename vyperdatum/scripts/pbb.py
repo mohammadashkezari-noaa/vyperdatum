@@ -16,6 +16,7 @@ def get_tiff_files(parent_dir: str, extention: str) -> list:
 
 if __name__ == "__main__":
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL2205-TB-C"
+    parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1815-TB-N"
     files = get_tiff_files(parent_dir, extention=".tif")
     
     # files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1813-TB-N\FL1813-TB-N_US4FL2DJ_ellipsoidal_dem.tif"]
