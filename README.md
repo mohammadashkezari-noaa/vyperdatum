@@ -18,12 +18,7 @@ conda activate vd
 conda install -c conda-forge proj=9.4 gdal=3.8.4 python-pdal
 pip install vyperdatum
 ```
-Before running vyperdatum, you need to copy NOAA's datum files and the updated `proj.db` into the PROJ data directory [download link will be added here]. This process may get automated in the future. The Proj data directory path can be found here:
-
-```python
-import pyproj as pp
-pp.datadir.get_data_dir()
-```
+Before running vyperdatum, you need to download NOAA's datum files and the updated `proj.db` [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15184045.svg)](https://doi.org/10.5281/zenodo.15184045). Once downloaded, create a persistent environment variable `VYPER_GRIDS` to hold the path to directory where the downloaded grids and `proj.db` are located. 
 
 ## Usage
 Vyperdatum offers a `Transformer` class to handle the transformation of point and raster data. The `Transformer` class applies transformation from `crs_from` to `crs_to` coordinate reference system. By default the transformation steps will be determined automatically:
