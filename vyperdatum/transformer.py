@@ -16,7 +16,7 @@ import numpy as np
 from osgeo import gdal, osr, ogr
 from tqdm import tqdm
 from vyperdatum.utils import raster_utils, crs_utils, drivers_utils
-from vyperdatum.utils.raster_utils import raster_metadata, update_raster_wkt
+from vyperdatum.utils.raster_utils import raster_metadata, update_raster_wkt, overwrite_with_original
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
 from vyperdatum.drivers import vrbag, laz, npz, pdal_based, gparq
 from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
@@ -71,7 +71,7 @@ class Transformer():
             # self.steps = nwld_ITRF2020_steps(h0, v0, h1, v1)
             self.steps = nwld_NAD832011_steps(h0, v0, h1, v1)
         if not crs_utils.validate_transform_steps_dict(self.steps):
-            raise ValueError("Invalid transformation pipeline.")
+            raise ValueError(f"Invalid transformation pipeline: {self.steps}.")
         return
 
     @classmethod
@@ -714,10 +714,13 @@ class Transformer():
             vyper_meta = json.dumps(vyper_meta)
             ds.SetMetadataItem("Vyperdatum_Metadata", vyper_meta)
 
+
             output_ds = gdal.Translate(output_file, ds, format="GTiff",
                                        outputType=gdal.GDT_Float32,
                                        creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
             output_ds = None
+            # overwrite the non-elevation bands with the original data            
+            overwrite_with_original(input_file, output_file)
             update_raster_wkt(output_file, to_wkt)
             input_metadata = raster_metadata(input_file)
             output_metadata = raster_metadata(output_file)
@@ -766,7 +769,7 @@ class Transformer():
                 efile.close()
         finally:
             if os.path.isfile(output_vrt):
-                os.remove(output_vrt)
+                os.remove(output_vrt)            
             return success
 
     def transform_vector(self,

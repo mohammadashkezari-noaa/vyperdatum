@@ -16,10 +16,10 @@ def get_tiff_files(parent_dir: str, extention: str) -> list:
 
 if __name__ == "__main__":
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL2205-TB-C"
-    parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1815-TB-N"
+    parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1812-TB-N"
     files = get_tiff_files(parent_dir, extention=".tif")
     
-    files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1815-TB-N\FL1815-TB-N_US4FL1GY_ellipsoidal_dem.tif"]
+    # files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1812-TB-N\2018_315000e_3080000n_tpu.tif"]
     crs_from = "EPSG:6346"
     crs_to = "EPSG:6346+NOAA:98"
     for i, input_file in enumerate(files[:]):
@@ -33,5 +33,5 @@ if __name__ == "__main__":
                             overview=False,
                             pre_post_checks=True,
                             vdatum_check=True
-                            )                    
+                            )                 
         print(f'\n{"*"*50} {i+1}/{len(files)} Completed {"*"*50}\n')
