@@ -24,6 +24,10 @@ from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
 
+# os.environ["CPL_DEBUG"] = "ON"
+# os.environ["CPL_LOG_ERRORS"] = "ON"
+# os.environ["PROJ_DEBUG"] = "3"
+
 
 class Transformer():
     def __init__(self,
@@ -158,7 +162,7 @@ class Transformer():
                   output_file: str,
                   pre_post_checks: bool = True,
                   vdatum_check: bool = False
-                  ):
+                  ) -> bool:
         """
         Top-level transform method.
 
@@ -181,65 +185,69 @@ class Transformer():
 
         Returns
         -----------
-        None
+        bool:
+            True if successful, otherwise False.
         """
-        if not os.path.isfile(input_file):
-            raise FileNotFoundError(f"The input file not found at {input_file}.")
+        try:
+            success = False    
+            if not os.path.isfile(input_file):
+                raise FileNotFoundError(f"The input file not found at {input_file}.")
 
-        if vrbag.is_vr(fname=input_file):
-            logger.info(f"Identified as vrbag file: {input_file}")
-            self.transform_vrbag(input_file=input_file,
-                                 output_file=output_file,
-                                 pre_post_checks=pre_post_checks,
-                                 vdatum_check=vdatum_check
-                                 )
-        elif gparq.GeoParquet(input_file=input_file, invalid_error=False).is_valid:
-            logger.info(f"Identified as geoparquet file: {input_file}")
-            self.transform_geoparquet(input_file=input_file,
-                                      output_file=output_file,
-                                      pre_post_checks=pre_post_checks,
-                                      vdatum_check=vdatum_check
-                                      )
-        elif laz.LAZ(input_file=input_file, invalid_error=False).is_valid:
-            logger.info(f"Identified as laz file: {input_file}")
-            self.transform_laz(input_file=input_file,
-                               output_file=output_file,
-                               pre_post_checks=pre_post_checks,
-                               vdatum_check=vdatum_check
-                               )
-        elif npz.NPZ(input_file=input_file, invalid_error=False).is_valid:
-            logger.info(f"Identified as npz file: {input_file}")
-            self.transform_npz(input_file=input_file,
-                               output_file=output_file,
-                               pre_post_checks=pre_post_checks,
-                               vdatum_check=vdatum_check
-                               )
-        elif pathlib.Path(input_file).suffix.lower() in self.gdal_extensions():
-            logger.info(f"Identified as GDAL-supported raster file: {input_file}")
-            self.transform_raster(input_file=input_file,
-                                  output_file=output_file,
-                                  pre_post_checks=pre_post_checks,
-                                  vdatum_check=vdatum_check
-                                  )
-        elif pdal_based.PDAL(input_file=input_file,
-                             output_file=output_file, invalid_error=False).is_valid:
-            logger.info(f"Identified as PDAL-supported file: {input_file}")
-            self.transform_pdal(input_file=input_file,
-                                output_file=output_file,
-                                pre_post_checks=pre_post_checks,
-                                vdatum_check=vdatum_check
-                                )
-        # elif vector files
-        else:
-            raise NotImplementedError(f"Unsupported input file: {input_file}")
-        return
+            if vrbag.is_vr(fname=input_file):
+                logger.info(f"Identified as vrbag file: {input_file}")
+                success = self.transform_vrbag(input_file=input_file,
+                                               output_file=output_file,
+                                               pre_post_checks=pre_post_checks,
+                                               vdatum_check=vdatum_check
+                                               )
+            elif gparq.GeoParquet(input_file=input_file, invalid_error=False).is_valid:
+                logger.info(f"Identified as geoparquet file: {input_file}")
+                success = self.transform_geoparquet(input_file=input_file,
+                                                    output_file=output_file,
+                                                    pre_post_checks=pre_post_checks,
+                                                    vdatum_check=vdatum_check
+                                                    )
+            elif laz.LAZ(input_file=input_file, invalid_error=False).is_valid:
+                logger.info(f"Identified as laz file: {input_file}")
+                success = self.transform_laz(input_file=input_file,
+                                             output_file=output_file,
+                                             pre_post_checks=pre_post_checks,
+                                             vdatum_check=vdatum_check
+                                             )
+            elif npz.NPZ(input_file=input_file, invalid_error=False).is_valid:
+                logger.info(f"Identified as npz file: {input_file}")
+                success = self.transform_npz(input_file=input_file,
+                                             output_file=output_file,
+                                             pre_post_checks=pre_post_checks,
+                                             vdatum_check=vdatum_check
+                                             )
+            elif pathlib.Path(input_file).suffix.lower() in self.gdal_extensions():
+                logger.info(f"Identified as GDAL-supported raster file: {input_file}")
+                success = self.transform_raster(input_file=input_file,
+                                                output_file=output_file,
+                                                pre_post_checks=pre_post_checks,
+                                                vdatum_check=vdatum_check
+                                                )
+            elif pdal_based.PDAL(input_file=input_file,
+                                output_file=output_file, invalid_error=False).is_valid:
+                logger.info(f"Identified as PDAL-supported file: {input_file}")
+                success = self.transform_pdal(input_file=input_file,
+                                              output_file=output_file,
+                                              pre_post_checks=pre_post_checks,
+                                              vdatum_check=vdatum_check
+                                              )
+            # elif vector files
+            else:
+                raise NotImplementedError(f"Unsupported input file: {input_file}")
+        finally:
+            return success
 
     def transform_points(self,
                          x: Union[float, int, list, np.ndarray],
                          y: Union[float, int, list, np.ndarray],
                          z: Union[float, int, list, np.ndarray],
                          always_xy: bool = False,
-                         vdatum_check: bool = True,
+                         vdatum_check: bool = False,
                          area_of_interest: Optional[AreaOfInterest] = None,
                          authority: Optional[str] = None,
                          accuracy: Optional[float] = None,
@@ -264,7 +272,7 @@ class Transformer():
             If true, the transform method will accept as input and return as output
             coordinates using the traditional GIS order, that is longitude, latitude
             for geographic CRS and easting, northing for most projected CRS.
-        vdatum_check: bool, default=True
+        vdatum_check: bool, default=False
             If True, a random sample of the transformed data are compared with transformation
             outcomes produced by Vdatum REST API.
         area_of_interest: :class:`.AreaOfInterest`, optional
@@ -299,9 +307,21 @@ class Transformer():
             ``only_best_default`` setting of :ref:`proj-ini`.
             The only_best kwarg overrides the default value if set.
             Requires PROJ 9.2+.
+
+        Returns
+        -----------
+        bool:
+            True if successful, otherwise False.            
+        numeric scalar or array:
+           Transformed x coordinate(s).
+        numeric scalar or array
+           Transformed y coordinate(s).
+        numeric scalar or array, optional
+           Transformed z coordinate(s).
         """
 
         try:
+            success = False
             xt, yt, zt = x.copy(), y.copy(), z.copy()
             for i in range(len(self.steps)):
                 logger.info(f"Step {i+1}/{len(self.steps)}:"
@@ -316,6 +336,7 @@ class Transformer():
                                                      force_over=force_over,
                                                      only_best=only_best
                                                      ).transform(xt, yt, zt)
+            success = True
             if vdatum_check:
                 vdatum_cv, vdatum_df = vdatum_cross_validate(s_wkt=pp.CRS(self.steps[0]["crs_from"]).to_wkt(),
                                                              t_wkt=pp.CRS(self.steps[-1]["crs_to"]).to_wkt(),
@@ -336,24 +357,26 @@ class Transformer():
                                                              t_h_zone=None
                                                             )
                 if not vdatum_cv:
+                    success = False
                     csv_path = os.path.join(os.getcwd(), "vdatum_check.csv")
                     vdatum_df.to_csv(csv_path, index=False)
                     logger.info(f"{Fore.RED}Vdatum checks on point data failed. "
                                 f"VDatum API outputs stored at: {csv_path}")
                     print(Style.RESET_ALL)
-                    return None, None, None
+                    return success, None, None, None
 
         except Exception:
             logger.exception("Error while running the point transformation.")
-            return None, None, None
-        return xt, yt, zt
+            return success, None, None, None
+        finally:
+            return success, xt, yt, zt
 
     def transform_vrbag(self,
                         input_file: str,
                         output_file: str,
                         pre_post_checks: bool = True,
                         vdatum_check: bool = True
-                        ):
+                        ) -> bool:
         """
         Transform variable resolution BAG file.
 
@@ -379,22 +402,26 @@ class Transformer():
 
         Returns
         -----------
-        None
+        bool:
+            True if successful, otherwise False.
         """
-        if not os.path.isfile(input_file):
-            raise FileNotFoundError(f"The input file not found at {input_file}.")
-        if not vrbag.is_vr(fname=input_file):
-            msg = (f"The following file is not a valid variable resolution bag file: {input_file}")
-            logger.exception(msg)
-            raise TypeError(msg)
         try:
+            success = False
+            if not os.path.isfile(input_file):
+                raise FileNotFoundError(f"The input file not found at {input_file}.")
+            if not vrbag.is_vr(fname=input_file):
+                msg = (f"The following file is not a valid variable resolution bag file: {input_file}")
+                logger.exception(msg)
+                raise TypeError(msg)
             pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             shutil.copy2(input_file, output_file)
             if pre_post_checks:
                 drivers_utils.vrbag_pre_transformation_checks(file_path=input_file,
                                                               source_crs=self.crs_from
                                                               )
-            vrbag.transform(fname=output_file, tf=self, point_transformation=True, vdatum_check=vdatum_check)
+            success = vrbag.transform(fname=output_file,
+                                      tf=self, point_transformation=True,
+                                      vdatum_check=vdatum_check)
             if pre_post_checks:
                 drivers_utils.vrbag_post_transformation_checks(file_path=output_file,
                                                                target_crs=self.crs_to
@@ -403,14 +430,15 @@ class Transformer():
             logger.exception(f"Exception in `transform_vrbag()`: {str(e)}")
             if os.path.isfile(output_file):
                 os.remove(output_file)
-        return
+        finally:
+            return success
 
     def transform_laz(self,
                       input_file: str,
                       output_file: str,
                       pre_post_checks: bool = True,
                       vdatum_check: bool = True
-                      ):
+                      ) -> bool:
         """
         Transform point-cloud LAZ file.
 
@@ -436,11 +464,13 @@ class Transformer():
 
         Returns
         -----------
-        None
+        bool:
+            True if successful, otherwise False.
         """
-        if not os.path.isfile(input_file):
-            raise FileNotFoundError(f"The input file not found at {input_file}.")
         try:
+            success = False
+            if not os.path.isfile(input_file):
+                raise FileNotFoundError(f"The input file not found at {input_file}.")
             pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             shutil.copy2(input_file, output_file)
             lz = laz.LAZ(input_file=output_file)
@@ -448,7 +478,7 @@ class Transformer():
                 drivers_utils.laz_pre_transformation_checks(file_path=input_file,
                                                             source_crs=self.crs_from
                                                             )
-            lz.transform(transformer_instance=self, vdatum_check=vdatum_check)
+            success = lz.transform(transformer_instance=self, vdatum_check=vdatum_check)
             if pre_post_checks:
                 drivers_utils.laz_post_transformation_checks(file_path=output_file,
                                                              target_crs=self.crs_to
@@ -457,14 +487,15 @@ class Transformer():
             logger.exception(f"Exception in `transform_laz()`: {str(e)}")
             if os.path.isfile(output_file):
                 os.remove(output_file)
-        return
+        finally:
+            return success
 
     def transform_geoparquet(self,
                              input_file: str,
                              output_file: str,
                              pre_post_checks: bool = True,
                              vdatum_check: bool = True
-                             ):
+                             ) -> bool:
         """
         Transform a geoparquet point file.
 
@@ -490,31 +521,33 @@ class Transformer():
 
         Returns
         -----------
-        None
+        bool:
+            True if successful, otherwise False.
         """
-        if not os.path.isfile(input_file):
-            raise FileNotFoundError(f"The input file not found at {input_file}.")
         try:
+            success = False
+            if not os.path.isfile(input_file):
+                raise FileNotFoundError(f"The input file not found at {input_file}.")
             pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             gp = gparq.GeoParquet(input_file=input_file)
 
-            gp.transform(transformer_instance=self,
-                         output_file=output_file,
-                         pre_post_checks=pre_post_checks,
-                         vdatum_check=vdatum_check)
-
+            success = gp.transform(transformer_instance=self,
+                                   output_file=output_file,
+                                   pre_post_checks=pre_post_checks,
+                                   vdatum_check=vdatum_check)
         except Exception as e:
             logger.exception(f"Exception in `transform_geoparquet()`: {str(e)}")
             if os.path.isfile(output_file):
                 os.remove(output_file)
-        return
+        finally:
+            return success
 
     def transform_npz(self,
                       input_file: str,
                       output_file: str,
                       pre_post_checks: bool = True,
                       vdatum_check: bool = True
-                      ):
+                      ) -> bool:
         """
         Transform a numpy npz file.
 
@@ -540,11 +573,13 @@ class Transformer():
 
         Returns
         -----------
-        None
+        bool:
+            True if successful, otherwise False.
         """
-        if not os.path.isfile(input_file):
-            raise FileNotFoundError(f"The input file not found at {input_file}.")
         try:
+            success = False
+            if not os.path.isfile(input_file):
+                raise FileNotFoundError(f"The input file not found at {input_file}.")
             pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             shutil.copy2(input_file, output_file)
             nz = npz.NPZ(input_file=output_file)
@@ -552,7 +587,7 @@ class Transformer():
                 drivers_utils.npz_pre_transformation_checks(file_path=input_file,
                                                             source_crs=self.crs_from
                                                             )
-            nz.transform(transformer_instance=self, vdatum_check=vdatum_check)
+            success = nz.transform(transformer_instance=self, vdatum_check=vdatum_check)
             if pre_post_checks:
                 drivers_utils.npz_post_transformation_checks(file_path=input_file,
                                                              target_crs=self.crs_to
@@ -561,14 +596,15 @@ class Transformer():
             logger.exception(f"Exception in `transform_npz()`: {str(e)}")
             if os.path.isfile(output_file):
                 os.remove(output_file)
-        return
+        finally:
+            return success
 
     def transform_pdal(self,
                        input_file: str,
                        output_file: str,
                        pre_post_checks: bool = True,
                        vdatum_check: bool = True
-                       ):
+                       ) -> bool:
         """
         Transform point-cloud data using PDAL.
 
@@ -594,19 +630,21 @@ class Transformer():
 
         Returns
         -----------
-        None
+        bool:
+            True if successful, otherwise False.
         """
-        # TODO implement vdatum_check
-        if not input_file.lower().startswith("http") and not os.path.isfile(input_file):
-            raise FileNotFoundError(f"The input file not found at {input_file}.")
+        # TODO implement vdatum_check in pd.transform()
         try:
+            success = False
+            if not input_file.lower().startswith("http") and not os.path.isfile(input_file):
+                raise FileNotFoundError(f"The input file not found at {input_file}.")
             pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             pdl = pdal_based.PDAL(input_file=input_file, output_file=output_file)
             if pre_post_checks:
                 drivers_utils.pdal_pre_transformation_checks(file_path=input_file,
                                                              source_crs=self.crs_from
                                                              )
-            pdl.transform(transformer_instance=self, vdatum_check=vdatum_check)
+            success = pdl.transform(transformer_instance=self, vdatum_check=vdatum_check)
             if pre_post_checks:
                 drivers_utils.pdal_post_transformation_checks(file_path=input_file,
                                                               target_crs=self.crs_to
@@ -615,7 +653,8 @@ class Transformer():
             logger.exception(f"Exception in `transform_pdal()`: {e}")
             if os.path.isfile(output_file):
                 os.remove(output_file)
-        return
+        finally:
+            return success
 
     def transform_raster(self,
                          input_file: str,
@@ -623,6 +662,7 @@ class Transformer():
                          overview: bool = False,
                          pre_post_checks: bool = True,
                          vdatum_check: bool = True,
+                         elevation_band: Optional[int] = None
                          ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
@@ -649,6 +689,10 @@ class Transformer():
         vdatum_check: bool, default=True
             If True, a random sample of the transformed data are compared with transformation
             outcomes produced by Vdatum REST API.
+        elevation_band: Optional[int], default=None
+            The index of the elevation band in the input file. If not provided,
+            the the index of a band named 'elevation' or 'dem' will be used. Raise exception,
+            If no such band name is found.
 
 
         Returns
@@ -718,9 +762,10 @@ class Transformer():
             output_ds = gdal.Translate(output_file, ds, format="GTiff",
                                        outputType=gdal.GDT_Float32,
                                        creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
+
             output_ds = None
             # overwrite the non-elevation bands with the original data            
-            overwrite_with_original(input_file, output_file)
+            overwrite_with_original(input_file, output_file, elevation_band)
             update_raster_wkt(output_file, to_wkt)
             input_metadata = raster_metadata(input_file)
             output_metadata = raster_metadata(output_file)

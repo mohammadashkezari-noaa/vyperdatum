@@ -100,7 +100,7 @@ class GeoParquet(Driver):
         w = gdf.crs.to_wkt()
         return w
 
-    def transform(self, transformer_instance, output_file: str, pre_post_checks: bool, vdatum_check: bool) -> None:
+    def transform(self, transformer_instance, output_file: str, pre_post_checks: bool, vdatum_check: bool) -> bool:
         """
         Apply point transformation on the geoparquet point data according to the `transformer_instance`.
 
@@ -113,7 +113,8 @@ class GeoParquet(Driver):
 
         Returns
         -----------
-        None
+        bool:
+            True if successful, otherwise False.
         """
         if not hasattr(self, "x"):
             self.get_points()
@@ -128,11 +129,11 @@ class GeoParquet(Driver):
                 logger.warning("The authority name/code registered in the "
                                f"input file is {file_auth}, but expected {source_auth}"
                                )
-        xt, yt, zt = transformer_instance.transform_points(self.x,
-                                                           self.y,
-                                                           self.z,
-                                                           vdatum_check=vdatum_check
-                                                           )
+        success, xt, yt, zt = transformer_instance.transform_points(self.x,
+                                                                    self.y,
+                                                                    self.z,
+                                                                    vdatum_check=vdatum_check
+                                                                    )
         new_geometry = [Point(xi, yi, zi) for xi, yi, zi in zip(xt, yt, zt)]
         new_gdf = gpd.GeoDataFrame(gdf[["Uncertainty", "Classification"]].copy(),
                                    geometry=new_geometry,
@@ -151,7 +152,7 @@ class GeoParquet(Driver):
                 logger.warning("The expected authority name/code of the "
                                f"transformed geoparquet is {target_auth}, but received {transformed_file_auth}"
                                )        
-        return
+        return success
 
     @property
     def is_valid(self):

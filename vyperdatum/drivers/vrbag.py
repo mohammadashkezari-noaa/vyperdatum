@@ -108,7 +108,7 @@ def base_grid_point_transform(fname: str,
             y = np.append(y, [_y])
             z = np.append(z, vr_elev[i, j])
 
-    _, _, zz = tf.transform_points(x, y, z)
+    _, _, _, zz = tf.transform_points(x, y, z)
     zz = np.where(z == nodata_value, z, zz)
     zz = zz.reshape(vr_elev_shape)
 
@@ -223,7 +223,7 @@ def single_subgrid_point_transform(fname: str,
     """
     try:
         start, x, y, z = get_subgrid_points(fname, i, j)
-        _, _, zz = tf.transform_points(x, y, z)
+        _, _, _, zz = tf.transform_points(x, y, z)
         zz = np.where(z == nodata_value, z, zz)
     except Exception as e:
         logger.exception(f"Unexpected exception in single_subgrid_point_transform for subgrid {i}, {j}: {e}")
@@ -564,8 +564,8 @@ def update_vr_refinements(fname: str,
     update_vr_elevation(fname=fname, arr=zt)
     # update xml
     x1, y1, x2, y2 = corner_points(fname=fname)
-    y1, x1, _ = tf.transform_points(y1, x1, 0, always_xy=False, allow_ballpark=False)
-    y2, x2, _ = tf.transform_points(y2, x2, 0, always_xy=False, allow_ballpark=False)
+    _, y1, x1, _ = tf.transform_points(y1, x1, 0, always_xy=False, allow_ballpark=False)
+    _, y2, x2, _ = tf.transform_points(y2, x2, 0, always_xy=False, allow_ballpark=False)
     if tf.crs_to.is_compound:
         wkt_h = tf.crs_to.sub_crs_list[0].to_wkt()
         wkt_v = tf.crs_to.sub_crs_list[1].to_wkt()
@@ -587,7 +587,7 @@ def transform(fname: str,
               vdatum_check: bool = True,
               point_transformation: bool = True,
               **kwargs
-              ):
+              ) -> bool:
     """
     Transform vrbag according to the `tf` Transformer object.
     When `point_transformation` is True, point transformation is applied, otherwise
@@ -625,28 +625,35 @@ def transform(fname: str,
 
     Returns
     ----------
-    None
+    bool:
+        True if successful, otherwise False.
     """
-    if not is_vr(fname=fname):
-        msg = (f"The following file is not a valid variable resolution bag file: {fname}")
-        logger.exception(msg)
-        raise TypeError(msg)
-    if not point_transformation and "rasters_dir" not in kwargs.keys():
-        msg = ("For raster transformation approach, you must pass `rasters_dir` parameter"
-               " to the `transform_vr` function.")
-        logger.exception(msg)
-        raise KeyError(msg)
-    tic = time.time()
-    if point_transformation:
-        index, zt = subgrid_point_transform(fname, tf=tf)
-    else:
-        index, zt = subgrid_raster_transform(fname=fname,
-                                             rasters_dir=kwargs["rasters_dir"],
-                                             tf=tf
-                                             )
-    update_vr_refinements(fname=fname, index=index, arr=zt, tf=tf)
-    logger.info(f"VRBAG transformation processing time: {time.time() - tic:.2f}", )
-    return
+    try:
+        success = False
+        if not is_vr(fname=fname):
+            msg = (f"The following file is not a valid variable resolution bag file: {fname}")
+            logger.exception(msg)
+            raise TypeError(msg)
+        if not point_transformation and "rasters_dir" not in kwargs.keys():
+            msg = ("For raster transformation approach, you must pass `rasters_dir` parameter"
+                   " to the `transform_vr` function.")
+            logger.exception(msg)
+            raise KeyError(msg)
+        tic = time.time()
+        if point_transformation:
+            index, zt = subgrid_point_transform(fname, tf=tf)
+        else:
+            index, zt = subgrid_raster_transform(fname=fname,
+                                                 rasters_dir=kwargs["rasters_dir"],
+                                                 tf=tf
+                                                 )
+        update_vr_refinements(fname=fname, index=index, arr=zt, tf=tf)
+        logger.info(f"VRBAG transformation processing time: {time.time() - tic:.2f}", )
+        success = True
+    except Exception as e:
+        logger.exception(f"Unexpected exception in transform_vr: {e}")
+        return False
+    return success
 
 
 def wkt(fname: str) -> str:

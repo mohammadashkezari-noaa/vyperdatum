@@ -433,6 +433,10 @@ def update_raster_wkt(input_file: str, wkt: str) -> None:
     wkt: str
         New WKT to update the raster file.
     """
+    if os.path.exists(input_file):
+        err_msg = f"Trying to update WKT, but the input raster file {input_file} does not exist."
+        logger.error(err_msg)
+        raise FileNotFoundError(err_msg)
     ds = gdal.Open(input_file, gdal.GA_Update)
     ds.SetProjection(wkt)
     ds.FlushCache()
@@ -441,14 +445,14 @@ def update_raster_wkt(input_file: str, wkt: str) -> None:
 
 
 def overwrite_with_original(input_file: str,
-                          output_file: str,
-                          ) -> None:
+                            output_file: str,
+                            elevation_band: int = None
+                            ) -> None:
     """
-    Overwrite the non-elevation bands in the output file with 
+    Overwrite the non-elevation bands in the output file with
     the original input file band arrays. Currently, we assume that the elevation
     band is the first band in the input file. The other bands are assumed to be
     the same as the input file.
-    
 
     Parameters
     ----------
@@ -456,10 +460,30 @@ def overwrite_with_original(input_file: str,
         Absolute path to the input raster file.
     output_file: str
         Absolute path to the output raster file.
+    elevation_band: int, optional
+        The index of the elevation band in the input file. If not provided,
+        the the index of a band named 'elevation' or 'dem' will be used. Raise exception,
+        If no such band name is found.
+
+    Raises
+    ----------
+    ValueError:
+        If the elevation band is not found.
+
     """
     ds_in = gdal.Open(input_file, gdal.GA_ReadOnly)
     if ds_in.RasterCount < 2:
         return
+    if elevation_band is None:
+        band_count = ds_in.RasterCount
+        for i in range(1, band_count + 1):
+            band = ds_in.GetRasterBand(i)
+            if band.GetDescription().lower() in ["elevation", "dem"]:
+                elevation_band = i
+                break
+    if elevation_band is None:
+        raise ValueError("No elevation band found in the input raster file. "
+                         "Please provide the index of the elevation band.")
     ds_out = gdal.Open(output_file, gdal.GA_ReadOnly)
     input_metadata = raster_metadata(input_file)
     # combine the vertically transformed bands and
@@ -475,12 +499,12 @@ def overwrite_with_original(input_file: str,
     ds_temp.SetGeoTransform(ds_out.GetGeoTransform())
     ds_temp.SetProjection(ds_out.GetProjection())
     for b in range(1, ds_in.RasterCount+1):
-        if b == 1:
+        if b == elevation_band:
             out_shape = ds_out.GetRasterBand(b).ReadAsArray().shape
             in_shape = ds_in.GetRasterBand(b).ReadAsArray().shape
             if out_shape != in_shape:
                 logger.error(f"Band {b} dimensions has changed from"
-                                f"{in_shape} to {out_shape}")
+                             f"{in_shape} to {out_shape}")
             ds_temp.GetRasterBand(b).WriteArray(ds_out.GetRasterBand(b).ReadAsArray())
             ds_temp.GetRasterBand(b).SetDescription(ds_out.GetRasterBand(b).GetDescription())
             ds_temp.GetRasterBand(b).SetNoDataValue(ds_out.GetRasterBand(b).GetNoDataValue())
@@ -498,5 +522,4 @@ def overwrite_with_original(input_file: str,
 
     ds_temp = None
     gdal.Unlink(mem_path)
-
     return
