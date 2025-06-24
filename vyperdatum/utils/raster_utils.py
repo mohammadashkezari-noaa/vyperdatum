@@ -433,7 +433,7 @@ def update_raster_wkt(input_file: str, wkt: str) -> None:
     wkt: str
         New WKT to update the raster file.
     """
-    if os.path.exists(input_file):
+    if not os.path.exists(input_file):
         err_msg = f"Trying to update WKT, but the input raster file {input_file} does not exist."
         logger.error(err_msg)
         raise FileNotFoundError(err_msg)
