@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vyperdatum"
-version = "0.3.24"
+version = "0.3.25"
 authors = [
     {name = "Mohammad Ashkezari", email = "mohammad.ashkezari@noaa.gov"},
 ]

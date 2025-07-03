@@ -719,7 +719,7 @@ class Transformer():
 
             logger.info(f"Transformation Steps: {self.steps}")
             logger.info(f"Concatenated PROJ pipeline:\n{pipe}\n")
-            output_vrt = output_file.replace(".tif", ".vrt")
+            output_vrt = Path(output_file).with_suffix(".vrt")
             with gdal.Open(input_file, gdal.GA_ReadOnly) as input_ds:
                 geotransform = input_ds.GetGeoTransform()
                 xres, yres = geotransform[1], geotransform[5]
@@ -758,6 +758,12 @@ class Transformer():
             vyper_meta = json.dumps(vyper_meta)
             ds.SetMetadataItem("Vyperdatum_Metadata", vyper_meta)
 
+            # FUSE might have already created a file with the same name, so we need to check
+            if os.path.exists(output_file):
+                suffix = "_vyperdatum"
+                op = Path(output_file)
+                new_name = f"{op.stem}{suffix}{op.suffix}"
+                output_file = str(op.with_name(new_name))
 
             output_ds = gdal.Translate(output_file, ds, format="GTiff",
                                        outputType=gdal.GDT_Float32,
