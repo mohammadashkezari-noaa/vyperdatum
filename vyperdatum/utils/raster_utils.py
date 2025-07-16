@@ -2,6 +2,7 @@ import os
 import pathlib
 import logging
 import json
+import tempfile
 from osgeo import gdal
 import numpy as np
 from typing import Union, Optional
@@ -522,4 +523,142 @@ def overwrite_with_original(input_file: str,
 
     ds_temp = None
     gdal.Unlink(mem_path)
+    return
+
+
+def update_stats(input_file):
+    """
+    Update statistics for the raster file.
+
+    Parameters:
+        input_file (str): Path to the raster file.
+    """
+    ds = gdal.Open(input_file, gdal.GA_Update)
+    for i in range(1, ds.RasterCount + 1):
+        ds.GetRasterBand(i).ComputeStatistics(False)
+    ds = None
+    return
+
+
+def apply_nbs_bandnames(input_file):
+    """
+    Apply NBS band names to the raster file.
+    Sets the first band description to 'elevation' and the second band
+    description to 'uncertainty' if the raster has more than one band.
+
+    Parameters:
+        input_file (str): Path to the raster file.
+    """
+    ds = gdal.Open(input_file, gdal.GA_Update)
+    if ds is None:
+        err_msg = f"Could not open file: {input_file}"
+        logger.error(err_msg)
+        raise RuntimeError(err_msg)
+
+    band = ds.GetRasterBand(1)
+    band.SetDescription("elevation")
+
+    if ds.RasterCount > 1:
+        band = ds.GetRasterBand(2)
+        band.SetDescription("uncertainty")
+
+    band.FlushCache()
+    ds = None
+    return
+
+
+def add_uncertainty_band(input_file: str) -> None:
+    src_ds = gdal.Open(input_file)
+    if src_ds is None:
+        raise RuntimeError(f"Could not open {input_file}")
+
+    # assumes uncertainty band already exists
+    if src_ds.RasterCount > 1:
+        return
+
+    elev_band = src_ds.GetRasterBand(1)
+    nodata_val = elev_band.GetNoDataValue()
+    elevation = elev_band.ReadAsArray().astype(np.float32)
+
+    if nodata_val is not None:
+        mask = (elevation == nodata_val)
+    else:
+        mask = np.zeros_like(elevation, dtype=bool)
+
+    uncertainty = 1 + 0.02 * elevation
+    uncertainty[mask] = nodata_val if nodata_val is not None else 0
+
+    cols = src_ds.RasterXSize
+    rows = src_ds.RasterYSize
+    count = src_ds.RasterCount
+    geotransform = src_ds.GetGeoTransform()
+    projection = src_ds.GetProjection()
+    dtype = gdal.GDT_Float32
+
+    # Temp uncompressed file with extra band
+    tmp_uncompressed = tempfile.NamedTemporaryFile(suffix=".tif", delete=False)
+    tmp_uncompressed_path = tmp_uncompressed.name
+    tmp_uncompressed.close()
+
+    driver = gdal.GetDriverByName("GTiff")
+    raw_ds = driver.Create(tmp_uncompressed_path, cols, rows, count + 1, dtype)
+    raw_ds.SetGeoTransform(geotransform)
+    raw_ds.SetProjection(projection)
+
+    for i in range(count):
+        band = src_ds.GetRasterBand(i + 1)
+        data = band.ReadAsArray()
+        out_band = raw_ds.GetRasterBand(i + 1)
+        out_band.WriteArray(data)
+        out_band.SetDescription(band.GetDescription())
+        nd = band.GetNoDataValue()
+        if nd is not None:
+            out_band.SetNoDataValue(nd)
+
+    # Add uncertainty band
+    unc_band = raw_ds.GetRasterBand(count + 1)
+    unc_band.WriteArray(uncertainty)
+    unc_band.SetDescription("uncertainty")
+    if nodata_val is not None:
+        unc_band.SetNoDataValue(nodata_val)
+    unc_band.FlushCache()
+
+    raw_ds = None
+    src_ds = None
+
+    gdal.Translate(
+        destName=input_file,
+        srcDS=tmp_uncompressed_path,
+        creationOptions=[
+            "COMPRESS=DEFLATE",
+            "TILED=YES",
+            "BIGTIFF=IF_SAFER"
+        ],
+        format="GTiff"
+    )
+
+    os.remove(tmp_uncompressed_path)
+    return
+
+
+def apply_nbs_band_standards(input_file: str) -> None:
+    """
+    Apply NBS band standards to the raster file.
+    Sets the first band description to 'elevation' and the second band
+    description to 'uncertainty' if the raster has more than one band.
+    Adds uncertainty band if it does not exist, and updates statistics.
+
+    Parameters:
+        input_file (str): Path to the raster file.
+    """
+    if not os.path.exists(input_file):
+        err_msg = f"Raster file {input_file} does not exist."
+        logger.error(err_msg)
+        raise FileNotFoundError(err_msg)
+    ds = gdal.Open(input_file)
+    if ds.GetDriver().ShortName.lower() != "gtiff":
+        return
+    apply_nbs_bandnames(input_file)
+    add_uncertainty_band(input_file)
+    update_stats(input_file)
     return

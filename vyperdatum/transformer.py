@@ -16,7 +16,10 @@ import numpy as np
 from osgeo import gdal, osr, ogr
 from tqdm import tqdm
 from vyperdatum.utils import raster_utils, crs_utils, drivers_utils
-from vyperdatum.utils.raster_utils import raster_metadata, update_raster_wkt, overwrite_with_original
+from vyperdatum.utils.raster_utils import (raster_metadata,
+                                           update_raster_wkt,
+                                           overwrite_with_original,
+                                           apply_nbs_band_standards)
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
 from vyperdatum.drivers import vrbag, laz, npz, pdal_based, gparq
 from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
@@ -773,6 +776,7 @@ class Transformer():
             # overwrite the non-elevation bands with the original data            
             overwrite_with_original(input_file, output_file, elevation_band)
             update_raster_wkt(output_file, to_wkt)
+            apply_nbs_band_standards(output_file)
             input_metadata = raster_metadata(input_file)
             output_metadata = raster_metadata(output_file)
             if pre_post_checks:
