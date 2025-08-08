@@ -9,7 +9,7 @@ crs_to = "EPSG:6346+NOAA:93"
 
 
 # input_file = r"C:\Users\mohammad.ashkezari\Desktop\Fuse_Test\point\bag\Original\F00857\F00857_MB_50cm_LWD_1of1.bag"
-input_file = r"C:\Users\mohammad.ashkezari\Desktop\Fuse_Test\point\bag\Original\H11915\H11915_VB_5m_LWD_1of1_trimmed.bag"
+input_file = r"C:\Users\mohammad.ashkezari\Desktop\Fuse_Test\point\bag\Original\H11915\H11915_VB_5m_LWD_1of1.bag"
 tf = Transformer(crs_from=crs_from,
                 crs_to=crs_to,
                 )

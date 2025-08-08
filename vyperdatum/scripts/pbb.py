@@ -17,10 +17,11 @@ def get_tiff_files(parent_dir: str, extention: str) -> list:
 if __name__ == "__main__":
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL2205-TB-C"
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1812-TB-N"
+    parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\2020_ngs_topobathyDEM_michael_J1219754"
     files = get_tiff_files(parent_dir, extention=".tif")
     
     # files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1812-TB-N\2018_315000e_3080000n_tpu.tif"]
-    crs_from = "EPSG:6346"
+    crs_from = "EPSG:6346+EPSG:5703"
     crs_to = "EPSG:6346+NOAA:98"
     for i, input_file in enumerate(files[:]):
         print(f"{i+1}/{len(files)}: {input_file}")

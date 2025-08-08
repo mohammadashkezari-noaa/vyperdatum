@@ -12,12 +12,16 @@ class XYZ:
     def __init__(self,
                  input_file: str,
                  skiprows: Optional[int] = None,
-                 col_names: Optional[List[str]] = None
+                 col_names: Optional[List[str]] = None,
+                 negate_z: bool = False,
+                 unit_conversion: float = 1.0
                  ):
         self.input_file = input_file
         self.skiprows = self._detect_data_start() if skiprows is None else skiprows
         self.col_names = col_names
-        self.df = self.parse()
+        self.negate_z = negate_z
+        self.unit_conversion = unit_conversion
+        self.df = self._parse()
 
     def _detect_data_start(self) -> Optional[int]:
         with open(self.input_file, "r") as f:
@@ -33,7 +37,7 @@ class XYZ:
                         continue
         raise ValueError("No valid data lines found in file.")
 
-    def parse(self) -> pd.DataFrame:
+    def _parse(self) -> pd.DataFrame:
         """
         Reads the .XYZ file into a pandas DataFrame.
         If self.col_names is not set, assumes the first three columns are x, y, z.
@@ -52,6 +56,9 @@ class XYZ:
         else:
             column_names = base_names[:num_cols]
         df.columns = column_names
+        if self.negate_z:
+            df["z"] = -df["z"]
+        df["z"] *= self.unit_conversion
         return df
 
     def transform(self,
@@ -77,58 +84,58 @@ class XYZ:
         if not success:
             raise ValueError("Transformation failed.")
         self.df["x_t"], self.df["y_t"], self.df["z_t"] = xt, yt, zt
+        if self.negate_z:
+            self.df["z"] = -self.df["z"]
+            self.df["z_t"] = -self.df["z_t"]
+        self.df["Uncertainty"] = 1 + 0.02 * self.df["z_t"].abs()
         return self.df
 
     def to_gpkg(self,
                 crs: str,
                 output_file: str) -> None:
-        try:
-            x, y, z = self.df["x"].values, self.df["y"].values, self.df["z"].values
-            tdf = pd.DataFrame({"x": x, "y": y, "z": z})
-            temp_file = Path(output_file).with_suffix(".tmp.csv")
-            tdf.to_csv(temp_file, index=False)
-            tdf["geometry"] = tdf.apply(lambda row: Point(row["x"], row["y"], row["z"]), axis=1)
-            gdf = gpd.GeoDataFrame(tdf, geometry="geometry", crs=crs)
-            gdf.to_file(output_file, driver="GPKG")
-        finally:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+        tdf = pd.DataFrame({"x": self.df["x_t"].values,
+                            "y": self.df["y_t"].values,
+                            "Elevation": self.df["z_t"].values,
+                            })
+        tdf["geometry"] = tdf.apply(lambda row: Point(row["x"], row["y"], row["Elevation"]), axis=1)
+        tdf["Uncertainty"] = self.df["Uncertainty"].values
+        gdf = gpd.GeoDataFrame(tdf, geometry="geometry", crs=crs)
+        gdf.to_file(output_file, driver="GPKG")
         return
 
 
 # from vyperdatum.pipeline import Pipeline
 # import sys
 # # print(Pipeline(crs_from="ESRI:103060", crs_to="EPSG:6318").graph_steps())
-# print(Pipeline(crs_from="NOAA:1731", crs_to="EPSG:6319").graph_steps())
+# print(Pipeline(crs_from="EPSG:6783", crs_to="EPSG:6344").graph_steps())
 # sys.exit()
 
 
 
 input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\point\MLG\Original\AR_01_BAR_20240117_PR\AR_01_BAR_20240117_PR.XYZ"
-crs_from = "ESRI:103295+NOAA:65" # MLG depth
-# crs_from = "ESRI:103060+NOAA:65" # deprecated but 103295 has no transform path to NAD83
-crs_to = "EPSG:6344+NOAA:74"  # MLLW depth
+crs_from = "EPSG:3452+NOAA:1502" # MLG depth not usable for now, use NOAA:1502 USACE height
+crs_to = "EPSG:6344+NOAA:100"  # MLLW depth (due to current db issues, I use NOAA:101 and negate to get depth)
+negate_z = True  # MLG depth is negative, NOAA:98 is positive
 
 
-# steps = [{"crs_from": "ESRI:103295", "crs_to": "EPSG:6783", "v_shift": False},
-#          {"crs_from": "EPSG:6318+NOAA:65", "crs_to": "EPSG:6318+NOAA:78", "v_shift": True},
-#          {"crs_from": "EPSG:6318", "crs_to": "EPSG:6344", "v_shift": False}
-#          ]
-
-steps = [{"crs_from": "ESRI:103295", "crs_to": "EPSG:6783", "v_shift": False},
-         {"crs_from": "EPSG:6318+NOAA:65", "crs_to": "EPSG:6319", "v_shift": True},
-         {"crs_from": "EPSG:6319", "crs_to": "EPSG:6318+NOAA:74", "v_shift": True},
+steps = [{"crs_from": "EPSG:3452", "crs_to": "EPSG:6318", "v_shift": False},
+         {"crs_from": "EPSG:6318+NOAA:1502", "crs_to": "EPSG:6318+NOAA:101", "v_shift": True},
          {"crs_from": "EPSG:6318", "crs_to": "EPSG:6344", "v_shift": False}
          ]
 
-
 xyz = XYZ(input_file=input_file,
+          negate_z=negate_z,
+          unit_conversion=0.3048006096
         #   skiprows=15,
-        #   col_names=["xccc", "y", "z"]
+        #   col_names=["xi", "yi", "zi"]
           )
 df = xyz.transform(crs_from=crs_from, crs_to=crs_to,
                    steps=steps
                    )
+output_file = input_file.replace("Original", "Manual").replace(".XYZ", ".gpkg")
+os.makedirs(os.path.dirname(output_file), exist_ok=True)
+xyz.to_gpkg(crs=crs_to, output_file=output_file)
+
 print(df.head())
 
 

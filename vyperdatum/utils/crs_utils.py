@@ -350,6 +350,27 @@ def validate_transform_steps_dict(steps: Optional[list[dict]]) -> bool:
             approve = False
     return approve
 
+def multiple_geodetic_crs(steps: Optional[list[dict]]) -> bool:
+    """
+    Check if there are more than one geodetic crs in the pipeline.
+
+    Parameters
+    ---------
+    steps: Optional[list[dict]]
+        List of dict objects containing crs_from/to in form of `authority:code`
+        representing the CRSs involved in a transformation pipeline.
+
+
+    Returns
+    --------
+    bool:
+        `False` if all horizontal CRSs in the pipeline share the same geodetic CRS, otherwise return `True`.
+    """
+    geodetics = []
+    for step in steps:
+        h = step["crs_from"].split("+")[0]
+        geodetics.append(":".join(pp.CRS(pp.CRS(h).geodetic_crs).to_authority()))
+    return len(set(geodetics)) != 1
 
 def commandline(command: str,
                 args: Optional[list[str]] = None) -> tuple[Optional[dict], Optional[str]]:

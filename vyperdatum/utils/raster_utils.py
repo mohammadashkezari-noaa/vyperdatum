@@ -658,6 +658,7 @@ def apply_nbs_band_standards(input_file: str) -> None:
     ds = gdal.Open(input_file)
     if ds.GetDriver().ShortName.lower() != "gtiff":
         return
+    
     apply_nbs_bandnames(input_file)
     add_uncertainty_band(input_file)
     update_stats(input_file)

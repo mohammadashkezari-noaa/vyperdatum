@@ -726,17 +726,28 @@ class Transformer():
             with gdal.Open(input_file, gdal.GA_ReadOnly) as input_ds:
                 geotransform = input_ds.GetGeoTransform()
                 xres, yres = geotransform[1], geotransform[5]
-            ds = gdal.Warp(output_vrt, input_file, format="vrt",
-                           outputType=gdal.gdalconst.GDT_Float32,
-                           warpOptions=["APPLY_VERTICAL_SHIFT=YES",
-                                        "SAMPLE_GRID=YES",
-                                        "SAMPLE_STEPS=ALL"],
-                           errorThreshold=0,
-                           xRes=xres,
-                           yRes=yres,
-                           outputBounds=input_metadata["extent"],
-                           coordinateOperation=pipe
-                           )
+            
+            wopt = ["SAMPLE_GRID=YES", "SAMPLE_STEPS=ALL"]
+            if v_shift:
+                wopt.append("APPLY_VERTICAL_SHIFT=YES")
+            if crs_utils.multiple_geodetic_crs(self.steps):
+                # remove res and extent options when multiple geodetic CRS are involved
+                ds = gdal.Warp(output_vrt, input_file, format="vrt",
+                               outputType=gdal.gdalconst.GDT_Float32,
+                               warpOptions=wopt,
+                               errorThreshold=0,
+                               coordinateOperation=pipe
+                               )
+            else:
+                ds = gdal.Warp(output_vrt, input_file, format="vrt",
+                               outputType=gdal.gdalconst.GDT_Float32,
+                               warpOptions=wopt,
+                               errorThreshold=0,
+                               xRes=xres,
+                               yRes=yres,
+                               outputBounds=input_metadata["extent"],
+                               coordinateOperation=pipe
+                               )
             pipe = re.sub(r"\s{2,}", " ", pipe).strip()
             to_wkt = self.crs_to.to_wkt()
             to_wkt = re.sub(r"\s{2,}", " ", to_wkt).strip()

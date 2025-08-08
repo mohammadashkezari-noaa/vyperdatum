@@ -1,4 +1,3 @@
-import warnings
 import numpy as np
 import pathlib
 from collections import Counter
