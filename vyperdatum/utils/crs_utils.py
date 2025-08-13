@@ -370,7 +370,44 @@ def multiple_geodetic_crs(steps: Optional[list[dict]]) -> bool:
     for step in steps:
         h = step["crs_from"].split("+")[0]
         geodetics.append(":".join(pp.CRS(pp.CRS(h).geodetic_crs).to_authority()))
+        h = step["crs_to"].split("+")[0]
+        geodetics.append(":".join(pp.CRS(pp.CRS(h).geodetic_crs).to_authority()))
     return len(set(geodetics)) != 1
+
+def multiple_projections(steps: Optional[list[dict]]) -> bool:
+    """
+    Check if there are more than one projection types in the pipeline.
+
+    Parameters
+    ---------
+    steps: Optional[list[dict]]
+        List of dict objects containing crs_from/to in form of `authority:code`
+        representing the CRSs involved in a transformation pipeline.
+
+
+    Returns
+    --------
+    bool:
+        `False` if all projected CRSs use the same projection, otherwise return `True`.
+    """
+    def _projection_type(c: pp.CRS) -> str:
+        lower_name = c.name.lower()
+        spcs_keywords = ["state plane", "spcs", "fips", "stateplane"]
+        if "utm" in lower_name:
+            return "utm"
+        elif any(s in lower_name for s in spcs_keywords):    
+            return "spcs"
+        else:
+            return "others"
+    projs = []
+    for step in steps:
+        c = pp.CRS(step["crs_from"].split("+")[0])
+        if c.is_projected:
+            projs.append(_projection_type(c))
+        c = pp.CRS(step["crs_to"].split("+")[0])
+        if c.is_projected:
+            projs.append(_projection_type(c))
+    return len(set(projs)) > 1
 
 def commandline(command: str,
                 args: Optional[list[str]] = None) -> tuple[Optional[dict], Optional[str]]:

@@ -726,12 +726,12 @@ class Transformer():
             with gdal.Open(input_file, gdal.GA_ReadOnly) as input_ds:
                 geotransform = input_ds.GetGeoTransform()
                 xres, yres = geotransform[1], geotransform[5]
-            
+
             wopt = ["SAMPLE_GRID=YES", "SAMPLE_STEPS=ALL"]
             if v_shift:
                 wopt.append("APPLY_VERTICAL_SHIFT=YES")
-            if crs_utils.multiple_geodetic_crs(self.steps):
-                # remove res and extent options when multiple geodetic CRS are involved
+            if crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps):
+                # remove res and extent options when multiple geodetic CRS, multiple projects are involved
                 ds = gdal.Warp(output_vrt, input_file, format="vrt",
                                outputType=gdal.gdalconst.GDT_Float32,
                                warpOptions=wopt,
