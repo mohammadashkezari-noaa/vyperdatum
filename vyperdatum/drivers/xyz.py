@@ -1,10 +1,20 @@
-import numpy as np
+
+import os
+from pathlib import Path
 from typing import Optional, List
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
 from vyperdatum.drivers.base import Driver
+import pyproj as pp
+import logging
+from osgeo import gdal
+from vyperdatum.utils.crs_utils import auth_code
+from vyperdatum.drivers.base import Driver
 
+
+logger = logging.getLogger("root_logger")
+gdal.UseExceptions()
 
 class XYZ(Driver):
     """
@@ -111,17 +121,14 @@ class XYZ(Driver):
         df["z"] *= self.unit_conversion
         return df
 
-
     def wkt(self) -> str:
         """
         Return wkt stored in the xyz file.
         Will raise NotImplementedError as xyz files do not have a dedicated attribute for WKT.
         """
         raise NotImplementedError("xyz files have no dedicated attribute for WKT.")
-        return None
 
-
-    def transform(self, transformer_instance, output_file: str, vdatum_check: bool) -> bool:
+    def transform(self, transformer_instance, output_file: str, pre_post_checks: bool, vdatum_check: bool) -> bool:
         """
         Apply point transformation on npz data according to the `transformer_instance`.
 
@@ -140,6 +147,20 @@ class XYZ(Driver):
             True if successful, otherwise False.
         """
         x, y, z = self.df["x"].values, self.df["y"].values, self.df["z"].values
+
+        if pre_post_checks:
+            # Cannot check the CRS of xyz file as has no wkt.
+            pass
+            # source_crs = transformer_instance.crs_from
+            # if not isinstance(transformer_instance.crs_from, pp.CRS):
+            #     source_crs = pp.CRS(transformer_instance.crs_from)
+            # source_auth = auth_code(source_crs)
+            # file_auth = auth_code(pp.CRS(self.wkt()))
+            # if source_auth != file_auth:
+            #     logger.warning("The authority name/code registered in the "
+            #                    f"input file is {file_auth}, but expected {source_auth}"
+            #                    )
+
         success, xt, yt, zt = transformer_instance.transform_points(x, y, z,
                                                                     vdatum_check=vdatum_check)
         if not success:
@@ -150,22 +171,40 @@ class XYZ(Driver):
             self.df["z_t"] = -self.df["z_t"]
         self.df["Uncertainty"] = 1 + 0.02 * self.df["z_t"].abs()
 
-        self.to_gpkg(crs=transformer_instance.crs_to, output_file=output_file)
+        output_file = self.to_gpkg(crs=transformer_instance.crs_to, output_file=output_file)
+
+        if pre_post_checks:
+            new_gdf = gpd.read_file(output_file)
+            target_crs = transformer_instance.crs_to
+            if not isinstance(transformer_instance.crs_to, pp.CRS):
+                target_crs = pp.CRS(transformer_instance.crs_to)
+            target_auth = auth_code(target_crs)
+            transformed_file_auth = auth_code(pp.CRS(new_gdf.crs.to_wkt()))
+            if target_auth != transformed_file_auth:
+                logger.warning("The expected authority name/code of the "
+                               f"transformed geoparquet is {target_auth}, but received {transformed_file_auth}"
+                               )
         return success
 
     def to_gpkg(self,
                 crs: str,
                 output_file: str) -> None:
-        tdf = pd.DataFrame({"x": self.df["x_t"].values,
-                            "y": self.df["y_t"].values,
-                            "Elevation": self.df["z_t"].values,
-                            })
-        tdf["geometry"] = tdf.apply(lambda row: Point(row["x"], row["y"], row["Elevation"]), axis=1)
-        tdf["Uncertainty"] = self.df["Uncertainty"].values
-        gdf = gpd.GeoDataFrame(tdf, geometry="geometry", crs=crs)
-        gdf.to_file(output_file, driver="GPKG")
-        return
-    
+        try:
+            output_file = str(Path(output_file).with_suffix(".gpkg"))
+            tdf = pd.DataFrame({"x": self.df["x_t"].values,
+                                "y": self.df["y_t"].values,
+                                "Elevation": self.df["z_t"].values,
+                                })
+            tdf["geometry"] = tdf.apply(lambda row: Point(row["x"], row["y"], row["Elevation"]), axis=1)
+            tdf["Uncertainty"] = self.df["Uncertainty"].values
+            gdf = gpd.GeoDataFrame(tdf, geometry="geometry", crs=crs)
+            gdf.to_file(output_file, driver="GPKG")
+        except Exception as e:
+            if os.path.isfile(output_file):
+                os.remove(output_file)
+            raise RuntimeError(f"Failed to write output to GPKG: {output_file}. Error: {e}")
+        return output_file
+
     @property
     def is_valid(self):
         return self.is_xyz

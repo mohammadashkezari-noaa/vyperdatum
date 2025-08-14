@@ -21,7 +21,7 @@ from vyperdatum.utils.raster_utils import (raster_metadata,
                                            overwrite_with_original,
                                            apply_nbs_band_standards)
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
-from vyperdatum.drivers import vrbag, laz, npz, pdal_based, gparq
+from vyperdatum.drivers import vrbag, laz, npz, pdal_based, gparq, xyz
 from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
 
 logger = logging.getLogger("root_logger")
@@ -164,7 +164,8 @@ class Transformer():
                   input_file: str,
                   output_file: str,
                   pre_post_checks: bool = True,
-                  vdatum_check: bool = False
+                  vdatum_check: bool = False,
+                  **kwargs
                   ) -> bool:
         """
         Top-level transform method.
@@ -224,6 +225,14 @@ class Transformer():
                                              pre_post_checks=pre_post_checks,
                                              vdatum_check=vdatum_check
                                              )
+            elif xyz.XYZ(input_file=input_file, invalid_error=False).is_valid:
+                logger.info(f"Identified as xyz file: {input_file}")
+                success = self.transform_xyz(input_file=input_file,
+                                             output_file=output_file,
+                                             pre_post_checks=pre_post_checks,
+                                             vdatum_check=vdatum_check,
+                                             **kwargs
+                                             )
             elif pathlib.Path(input_file).suffix.lower() in self.gdal_extensions():
                 logger.info(f"Identified as GDAL-supported raster file: {input_file}")
                 success = self.transform_raster(input_file=input_file,
@@ -232,7 +241,7 @@ class Transformer():
                                                 vdatum_check=vdatum_check
                                                 )
             elif pdal_based.PDAL(input_file=input_file,
-                                output_file=output_file, invalid_error=False).is_valid:
+                                 output_file=output_file, invalid_error=False).is_valid:
                 logger.info(f"Identified as PDAL-supported file: {input_file}")
                 success = self.transform_pdal(input_file=input_file,
                                               output_file=output_file,
@@ -488,6 +497,59 @@ class Transformer():
                                                              )
         except Exception as e:
             logger.exception(f"Exception in `transform_laz()`: {str(e)}")
+            if os.path.isfile(output_file):
+                os.remove(output_file)
+        finally:
+            return success
+
+    def transform_xyz(self,
+                      input_file: str,
+                      output_file: str,
+                      pre_post_checks: bool = True,
+                      vdatum_check: bool = True,
+                      **kwargs
+                      ) -> bool:
+        """
+        Transform point-cloud XYZ file.
+
+        Parameters
+        -----------
+        input_file: str
+            Path to the input xyz file.
+        output_file: str
+            Path to the output transformed xyz file.
+        pre_post_checks: bool, default=True
+            If True, runs a series of validation checks, such as validating the input and output
+            CRSs, before and after transformation operation.
+        vdatum_check: bool, default=True
+            If True, a random sample of the transformed data are compared with transformation
+            outcomes produced by Vdatum REST API.
+
+        Raises
+        -------
+        FileNotFoundError:
+            If the input file is not found.
+        TypeError
+            If the passed xyz file is not valid.
+
+        Returns
+        -----------
+        bool:
+            True if successful, otherwise False.
+        """
+        try:
+            success = False
+            if not os.path.isfile(input_file):
+                raise FileNotFoundError(f"The input file not found at {input_file}.")
+            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
+            xyz_ins = xyz.XYZ(input_file=input_file, **kwargs)
+
+            success = xyz_ins.transform(transformer_instance=self,
+                                        output_file=output_file,
+                                        pre_post_checks=pre_post_checks,
+                                        vdatum_check=vdatum_check)
+        except Exception as e:
+            logger.exception(f"Exception in `transform_xyz()`: {str(e)}")
             if os.path.isfile(output_file):
                 os.remove(output_file)
         finally:
