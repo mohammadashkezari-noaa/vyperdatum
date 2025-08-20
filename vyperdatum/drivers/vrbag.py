@@ -171,25 +171,46 @@ def get_subgrid_points(fname: str, i: int, j: int) -> tuple[list[int], list[floa
         Starting index of subgrid.
         x, y, z coordinates of the subgrid points.
     """
-    ds_gdal = gdal.Open(fname)
-    geot = ds_gdal.GetGeoTransform()
-    bag = h5py.File(fname)
-    root = bag["BAG_root"]
-    vr_meta = root["varres_metadata"]
-    vr_ref = root["varres_refinements"][0]
+    try:
+        er = "00"
 
-    start = vr_meta[i, j][0]
-    dim_x, dim_y = vr_meta[i, j][1], vr_meta[i, j][2]
-    res_x, res_y = vr_meta[i, j][3], vr_meta[i, j][4]
-    sw_corner_x, sw_corner_y = vr_meta[i, j][5], vr_meta[i, j][6]
-    cell_x, cell_y = index_to_xy(i, j, geot, x_offset=sw_corner_x, y_offset=sw_corner_y)
+        ds_gdal = gdal.Open(fname)
+        er = "01"
+        geot = ds_gdal.GetGeoTransform()
+        er = "02"
+        bag = h5py.File(fname)
+        er = "03"
+        root = bag["BAG_root"]
+        er = "04"
+        vr_meta = root["varres_metadata"]
+        er = "05"
+        vr_ref = root["varres_refinements"][0]
 
-    x = np.array([cell_x + (i - i // dim_x) * res_x for i in range(dim_x*dim_y)])
-    y = np.array([cell_y + (i // dim_x) * res_y for i in range(dim_x*dim_y)])
-    z = np.array([vr[0] for vr in vr_ref[start:start+(dim_x*dim_y)]])
-    
-    ds_gdal = None
-    bag.close()
+        er = "06"
+        start = vr_meta[i, j][0]
+        dim_x, dim_y = vr_meta[i, j][1], vr_meta[i, j][2]
+        res_x, res_y = vr_meta[i, j][3], vr_meta[i, j][4]
+        sw_corner_x, sw_corner_y = vr_meta[i, j][5], vr_meta[i, j][6]
+        cell_x, cell_y = index_to_xy(i, j, geot, x_offset=sw_corner_x, y_offset=sw_corner_y)
+
+        er = "07"
+
+        x = np.array([cell_x + (i - i // dim_x) * res_x for i in range(dim_x*dim_y)])
+        y = np.array([cell_y + (i // dim_x) * res_y for i in range(dim_x*dim_y)])
+        z = np.array([vr[0] for vr in vr_ref[start:start+(dim_x*dim_y)]])
+        
+        er = "08"
+        
+        ds_gdal = None
+        bag.close()
+    except Exception as e:
+        print("SSSSSSSSSSSSSSSSSSSSSS")
+        print(er)
+        logger.exception(f"Unexpected exception in get_subgrid_points for subgrid {i}, {j}: {e}")
+        f = open("error.txt", "a")
+        f.write(f"Unexpected exception in get_subgrid_points for subgrid {i}, {j}: {e}\n")
+        f.close()
+        start, x, y, z = None, None, None, None
     return start, x, y, z
 
 
@@ -223,15 +244,16 @@ def single_subgrid_point_transform(fname: str,
     """
     try:
         start, x, y, z = get_subgrid_points(fname, i, j)
+        print("\n\n>>>>>>>>>>>>>>>>>>>>>\n\n")
+        print(start, x, y, z
+              )
         _, _, _, zz = tf.transform_points(x, y, z)
         zz = np.where(z == nodata_value, z, zz)
     except Exception as e:
         logger.exception(f"Unexpected exception in single_subgrid_point_transform for subgrid {i}, {j}: {e}")
-
         f = open("error.txt", "a")
         f.write(f"Unexpected exception in single_subgrid_point_transform for subgrid {i}, {j}: {e}\n")
         f.close()
-
         start, zz = None, None
 
     return start, zz
@@ -266,11 +288,12 @@ def subgrid_point_transform(fname: str,
             start = vr_meta[i, j][0]
             if start == vrb_enum.NO_REF_INDEX.value:
                 continue
-            # if i != 1 or j != 117:
-            #     continue
             ii.append(i)
             jj.append(j)
     bag.close()
+
+    ii = ii[:3]
+    jj = jj[:3]
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futureObjs = executor.map(single_subgrid_point_transform,
                                   [fname] * len(ii),
@@ -282,6 +305,14 @@ def subgrid_point_transform(fname: str,
             if fo[0] is not None:
                 start_indices.append(fo[0])
                 transformed_refs.append(fo[1])
+
+
+    # for i in tqdm(range(len(ii))):    
+    #     s, z = single_subgrid_point_transform(fname, ii[i], jj[i], tf, vrb_enum.NDV_REF.value)
+    #     if s is not None:
+    #         start_indices.append(s)
+    #         transformed_refs.append(z)
+    # # print(start_indices, transformed_refs)    
     return start_indices, transformed_refs
 
 
@@ -534,6 +565,9 @@ def update_vr_refinements(fname: str,
     ----------
     None
     """
+    
+    print("\n\n\nUpdating varres_refinements layer...\n\n\n")
+
 
     bag = h5py.File(fname, "r+")
     root = bag.require_group("/BAG_root")
@@ -564,8 +598,15 @@ def update_vr_refinements(fname: str,
     update_vr_elevation(fname=fname, arr=zt)
     # update xml
     x1, y1, x2, y2 = corner_points(fname=fname)
-    _, y1, x1, _ = tf.transform_points(y1, x1, 0, always_xy=False, allow_ballpark=False)
-    _, y2, x2, _ = tf.transform_points(y2, x2, 0, always_xy=False, allow_ballpark=False)
+    # _, y1, x1, _ = tf.transform_points([y1], [x1], [0], always_xy=False, allow_ballpark=False)
+    # _, y2, x2, _ = tf.transform_points([y2], [x2], [0], always_xy=False, allow_ballpark=False)
+
+    _, x1, y1, _ = tf.transform_points([y1], [x1], [0], always_xy=False, allow_ballpark=False)
+    _, x2, y2, _ = tf.transform_points([y2], [x2], [0], always_xy=False, allow_ballpark=False)
+
+
+
+
     if tf.crs_to.is_compound:
         wkt_h = tf.crs_to.sub_crs_list[0].to_wkt()
         wkt_v = tf.crs_to.sub_crs_list[1].to_wkt()
@@ -575,7 +616,7 @@ def update_vr_refinements(fname: str,
     wkt_h = wkt_h if wkt_h else ""
     wkt_v = wkt_v if wkt_v else ""
     change_corner_points_and_wkt(fname=fname,
-                                 new_points=f"{x1},{y1} {x2},{y2}",
+                                 new_points=f"{x1[0]},{y1[0]} {x2[0]},{y2[0]}",
                                  wkt_h=wkt_h,
                                  wkt_v=wkt_v
                                  )

@@ -83,12 +83,13 @@ def to_utm10(target_crs: str, input_tif: str, output_tif: str) -> None:
 
 if __name__ == "__main__":
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\CRD\Original\**\*.tif"
-    files = glob.glob(parent_dir, recursive=True)[:]
+    files = glob.glob(parent_dir, recursive=True)[:1]
     for i, input_file in enumerate(files):
         print(f"{i+1}/{len(files)}: {input_file}")
         meta = raster_metadata(input_file)
         crs_from = f"{meta['h_authcode']}+EPSG:5703"
-        crs_to = f"{meta['h_authcode']}+NOAA:101"
+        crs_from = f"EPSG:6339+EPSG:5703"
+        crs_to = f"EPSG:6339+NOAA:101"
         tf = Transformer(crs_from=crs_from,
                          crs_to=crs_to
                          )

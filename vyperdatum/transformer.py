@@ -793,7 +793,8 @@ class Transformer():
             if v_shift:
                 wopt.append("APPLY_VERTICAL_SHIFT=YES")
             if crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps):
-                # remove res and extent options when multiple geodetic CRS, multiple projects are involved
+                # remove res and extent options when multiple geodetic CRS or multiple projects are involved
+                # logger.info("Multiple geodetic CRS or projections detected, skipping res and extent options in gdal Warp.")
                 ds = gdal.Warp(output_vrt, input_file, format="vrt",
                                outputType=gdal.gdalconst.GDT_Float32,
                                warpOptions=wopt,
@@ -801,13 +802,16 @@ class Transformer():
                                coordinateOperation=pipe
                                )
             else:
+                # logger.info("Setting res and extent options in gdal Warp.")
+                # I have to remove the extent and resolution, because of limitations 
+                # in Fuse metadata object that doesn't specify the realization of the input/output horizontal CRS 
                 ds = gdal.Warp(output_vrt, input_file, format="vrt",
                                outputType=gdal.gdalconst.GDT_Float32,
                                warpOptions=wopt,
                                errorThreshold=0,
-                               xRes=xres,
-                               yRes=yres,
-                               outputBounds=input_metadata["extent"],
+                            #    xRes=xres,
+                            #    yRes=yres,
+                            #    outputBounds=input_metadata["extent"],
                                coordinateOperation=pipe
                                )
             pipe = re.sub(r"\s{2,}", " ", pipe).strip()

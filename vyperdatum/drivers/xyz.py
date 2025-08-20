@@ -149,7 +149,7 @@ class XYZ(Driver):
         x, y, z = self.df["x"].values, self.df["y"].values, self.df["z"].values
 
         if pre_post_checks:
-            # Cannot check the CRS of xyz file as has no wkt.
+            # Cannot check the CRS of xyz file as it has no wkt.
             pass
             # source_crs = transformer_instance.crs_from
             # if not isinstance(transformer_instance.crs_from, pp.CRS):
