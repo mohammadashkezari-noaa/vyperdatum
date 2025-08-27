@@ -794,11 +794,14 @@ class Transformer():
                 wopt.append("APPLY_VERTICAL_SHIFT=YES")
             if crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps):
                 # remove res and extent options when multiple geodetic CRS or multiple projects are involved
-                # logger.info("Multiple geodetic CRS or projections detected, skipping res and extent options in gdal Warp.")
+                logger.info("Multiple geodetic CRS or projections detected, skipping res and extent options in gdal Warp.")
                 ds = gdal.Warp(output_vrt, input_file, format="vrt",
                                outputType=gdal.gdalconst.GDT_Float32,
                                warpOptions=wopt,
                                errorThreshold=0,
+                               xRes=xres,
+                               yRes=yres,
+                               outputBounds=input_metadata["extent"],
                                coordinateOperation=pipe
                                )
             else:

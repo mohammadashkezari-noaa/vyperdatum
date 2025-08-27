@@ -399,12 +399,16 @@ def nwld_NAD832011_steps(h0: str, v0: Optional[str], h1: str, v1: Optional[str])
         steps.append({"crs_from": "EPSG:9755", "crs_to": "EPSG:6318", "v_shift": False})
     elif h0 != "EPSG:6318":
         steps.append({"crs_from": h0, "crs_to": ":".join(pp.CRS(h0).geodetic_crs.to_authority()), "v_shift": False})
-    if v0 is None:
-        steps.append({"crs_from": "EPSG:6319", "crs_to": f"EPSG:6318+{v1}", "v_shift": True})
-    elif v1 is None:
-        steps.append({"crs_from": f"EPSG:6318+{v0}", "crs_to": "EPSG:6319", "v_shift": True})
-    else:
-        steps.append({"crs_from": f"EPSG:6318+{v0}", "crs_to": f"EPSG:6318+{v1}", "v_shift": True})
+
+    # vertical shift step
+    if v0.strip().lower() != v1.strip().lower():
+        if v0 is None:
+            steps.append({"crs_from": "EPSG:6319", "crs_to": f"EPSG:6318+{v1}", "v_shift": True})
+        elif v1 is None:
+            steps.append({"crs_from": f"EPSG:6318+{v0}", "crs_to": "EPSG:6319", "v_shift": True})
+        else:
+            steps.append({"crs_from": f"EPSG:6318+{v0}", "crs_to": f"EPSG:6318+{v1}", "v_shift": True})
+
     if pp.CRS(h1).geodetic_crs.to_authority() == ("EPSG", "4326"):
         steps.append({"crs_from": "EPSG:6318", "crs_to": "EPSG:9755", "v_shift": False})
         steps.append({"crs_from": "EPSG:9755", "crs_to": h1, "v_shift": False})
