@@ -799,9 +799,11 @@ class Transformer():
                                outputType=gdal.gdalconst.GDT_Float32,
                                warpOptions=wopt,
                                errorThreshold=0,
+                               
                                xRes=xres,
                                yRes=yres,
                                outputBounds=input_metadata["extent"],
+
                                coordinateOperation=pipe
                                )
             else:
@@ -812,9 +814,9 @@ class Transformer():
                                outputType=gdal.gdalconst.GDT_Float32,
                                warpOptions=wopt,
                                errorThreshold=0,
-                            #    xRes=xres,
-                            #    yRes=yres,
-                            #    outputBounds=input_metadata["extent"],
+                               xRes=xres,
+                               yRes=yres,
+                               outputBounds=input_metadata["extent"],
                                coordinateOperation=pipe
                                )
             pipe = re.sub(r"\s{2,}", " ", pipe).strip()
@@ -848,9 +850,12 @@ class Transformer():
                 new_name = f"{op.stem}{suffix}{op.suffix}"
                 output_file = str(op.with_name(new_name))
 
-            output_ds = gdal.Translate(output_file, ds, format="GTiff",
+            cop = ["COMPRESS=DEFLATE"]
+            if input_metadata["driver"].lower() == "gtiff":
+                cop.append("TILED=YES")
+            output_ds = gdal.Translate(output_file, ds, format=input_metadata["driver"],
                                        outputType=gdal.GDT_Float32,
-                                       creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
+                                       creationOptions=cop)
 
             output_ds = None
             # overwrite the non-elevation bands with the original data            
@@ -859,6 +864,7 @@ class Transformer():
             apply_nbs_band_standards(output_file)
             input_metadata = raster_metadata(input_file)
             output_metadata = raster_metadata(output_file)
+
             if pre_post_checks:
                 raster_utils.raster_post_transformation_checks(source_meta=input_metadata,
                                                                target_meta=output_metadata,

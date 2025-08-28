@@ -409,6 +409,11 @@ def raster_post_transformation_checks(source_meta: dict,
         logger.warning("Number of bands in the source file "
                        f"({source_meta['bands']}) doesn't match target ({target_meta['bands']}).")
 
+    if source_meta["driver"] != target_meta["driver"]:
+        passed = False
+        logger.warning("The driver of the source file "
+                       f"({source_meta['driver']}) doesn't match target ({target_meta['driver']}).")
+
     if vertical_transform:
         if source_meta["dimensions"] != target_meta["dimensions"]:
             passed = False
@@ -425,23 +430,71 @@ def raster_post_transformation_checks(source_meta: dict,
 
 def update_raster_wkt(input_file: str, wkt: str) -> None:
     """
-    Update the WKT of a raster file.
+    Assign a new WKT to a GeoTIFF in-place, or to a BAG by recreating the file.
+    WARNING: This only *assigns* the SRS. If you're actually changing CRS
+    (e.g., degrees->meters), you must reproject with gdal.Warp instead.
 
     Parameters
     -----------
     input_file: str
         Absolute path to the input raster file.
     wkt: str
-        New WKT to update the raster file.
+        New WKT to update the raster file.    
     """
     if not os.path.exists(input_file):
         err_msg = f"Trying to update WKT, but the input raster file {input_file} does not exist."
         logger.error(err_msg)
         raise FileNotFoundError(err_msg)
-    ds = gdal.Open(input_file, gdal.GA_Update)
-    ds.SetProjection(wkt)
-    ds.FlushCache()
+
+    ds = gdal.Open(input_file, gdal.GA_ReadOnly)
+    if ds is None:
+        raise RuntimeError(f"GDAL cannot open: {input_file}")
+
+    drv = ds.GetDriver().ShortName.upper()
+
+    # GeoTIFF: update in place
+    if drv == "GTIFF":
+        ds = None
+        upd = gdal.Open(input_file, gdal.GA_Update)
+        if upd is None:
+            raise RuntimeError("Failed to reopen GeoTIFF in update mode.")
+        upd.SetProjection(wkt)
+        upd.FlushCache()
+        upd = None
+        return
+
+    # BAG: recreate with -a_srs
+    if drv == "BAG":
+        tmp_out = input_file + ".tmp.bag"
+
+        # Build gdal.Translate options equivalent to: -of BAG -a_srs "<wkt>"
+        topts = gdal.TranslateOptions(
+            options=["-of", "BAG", "-a_srs", wkt]
+        )
+        out = gdal.Translate(tmp_out, ds, options=topts)
+        if out is None:
+            raise RuntimeError("gdal.Translate failed when recreating BAG.")
+        out = None
+        ds = None
+
+        os.replace(tmp_out, input_file)
+        return
+
+    # Other drivers: try in-place, else fall back to copy-on-write via Translate
     ds = None
+    upd = gdal.Open(input_file, gdal.GA_Update)
+    if upd:
+        upd.SetProjection(wkt)
+        upd.FlushCache()
+        upd = None
+    else:
+        tmp_out = input_file + ".tmp"
+        topts = gdal.TranslateOptions(options=["-a_srs", wkt])
+        out = gdal.Translate(tmp_out, input_file, options=topts)
+        if out is None:
+            raise RuntimeError(f"Driver {drv} does not support updating SRS.")
+        out = None
+        os.replace(tmp_out, input_file)
     return
 
 
@@ -506,20 +559,24 @@ def overwrite_with_original(input_file: str,
             if out_shape != in_shape:
                 logger.error(f"Band {b} dimensions has changed from"
                              f"{in_shape} to {out_shape}")
-            ds_temp.GetRasterBand(b).WriteArray(ds_out.GetRasterBand(b).ReadAsArray())
             ds_temp.GetRasterBand(b).SetDescription(ds_out.GetRasterBand(b).GetDescription())
             ds_temp.GetRasterBand(b).SetNoDataValue(ds_out.GetRasterBand(b).GetNoDataValue())
+            ds_temp.GetRasterBand(b).WriteArray(ds_out.GetRasterBand(b).ReadAsArray())
         else:
-            ds_temp.GetRasterBand(b).WriteArray(ds_in.GetRasterBand(b).ReadAsArray())
             ds_temp.GetRasterBand(b).SetDescription(ds_in.GetRasterBand(b).GetDescription())
-            ds_temp.GetRasterBand(b).SetNoDataValue(ds_in.GetRasterBand(b).GetNoDataValue())
+            # ds_temp.GetRasterBand(b).SetNoDataValue(ds_in.GetRasterBand(b).GetNoDataValue())
+            ds_temp.GetRasterBand(b).WriteArray(ds_in.GetRasterBand(b).ReadAsArray())
     ds_in, ds_out = None, None
     ds_temp.FlushCache()
     driver.CreateCopy(output_file, ds_temp)
 
-    gdal.Translate(output_file, ds_temp, format="GTiff",
+    cop = ["COMPRESS=DEFLATE"]
+    if input_metadata["driver"].lower() == "gtiff":
+        cop.extend(["TILED=YES"])
+
+    gdal.Translate(output_file, ds_temp, format=input_metadata["driver"],
                    outputType=gdal.GDT_Float32,
-                   creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])     
+                   creationOptions=cop)     
 
     ds_temp = None
     gdal.Unlink(mem_path)
@@ -576,6 +633,7 @@ def add_uncertainty_band(input_file: str) -> None:
     if src_ds.RasterCount > 1:
         return
 
+    input_metadata = raster_metadata(input_file)
     elev_band = src_ds.GetRasterBand(1)
     nodata_val = elev_band.GetNoDataValue()
     elevation = elev_band.ReadAsArray().astype(np.float32)
@@ -626,15 +684,14 @@ def add_uncertainty_band(input_file: str) -> None:
     raw_ds = None
     src_ds = None
 
+    cop = ["COMPRESS=DEFLATE"]
+    if input_metadata["driver"].lower() == "gtiff":
+        cop.extend(["TILED=YES", "BIGTIFF=IF_SAFER"])
     gdal.Translate(
         destName=input_file,
         srcDS=tmp_uncompressed_path,
-        creationOptions=[
-            "COMPRESS=DEFLATE",
-            "TILED=YES",
-            "BIGTIFF=IF_SAFER"
-        ],
-        format="GTiff"
+        creationOptions=cop,
+        format=input_metadata["driver"]
     )
 
     os.remove(tmp_uncompressed_path)
