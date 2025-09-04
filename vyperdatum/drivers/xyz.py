@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 from typing import Optional, List
+import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
@@ -171,20 +172,36 @@ class XYZ(Driver):
             self.df["z_t"] = -self.df["z_t"]
         self.df["Uncertainty"] = 1 + 0.02 * self.df["z_t"].abs()
 
-        output_file = self.to_gpkg(crs=transformer_instance.crs_to, output_file=output_file)
+        # output_file = self.to_gpkg(crs=transformer_instance.crs_to, output_file=output_file)
+        _ = self.to_npy(output_file=output_file)
 
-        if pre_post_checks:
-            new_gdf = gpd.read_file(output_file)
-            target_crs = transformer_instance.crs_to
-            if not isinstance(transformer_instance.crs_to, pp.CRS):
-                target_crs = pp.CRS(transformer_instance.crs_to)
-            target_auth = auth_code(target_crs)
-            transformed_file_auth = auth_code(pp.CRS(new_gdf.crs.to_wkt()))
-            if target_auth != transformed_file_auth:
-                logger.warning("The expected authority name/code of the "
-                               f"transformed geoparquet is {target_auth}, but received {transformed_file_auth}"
-                               )
+        # if pre_post_checks:
+        #     new_gdf = gpd.read_file(output_file)
+        #     target_crs = transformer_instance.crs_to
+        #     if not isinstance(transformer_instance.crs_to, pp.CRS):
+        #         target_crs = pp.CRS(transformer_instance.crs_to)
+        #     target_auth = auth_code(target_crs)
+        #     transformed_file_auth = auth_code(pp.CRS(new_gdf.crs.to_wkt()))
+        #     if target_auth != transformed_file_auth:
+        #         logger.warning("The expected authority name/code of the "
+        #                        f"transformed geoparquet is {target_auth}, but received {transformed_file_auth}"
+        #                        )
         return success
+
+    def to_npy(self,
+               output_file: str) -> None:
+        try:
+            output_file = str(Path(output_file).with_suffix(".npy"))
+            out_npy = np.stack((self.df["x_t"].values,
+                                self.df["y_t"].values,
+                                self.df["z_t"].values), axis=1)
+            np.save(output_file, out_npy)
+        except Exception as e:
+            if os.path.isfile(output_file):
+                os.remove(output_file)
+            raise RuntimeError(f"Failed to write output to npy: {output_file}. Error: {e}")
+        return output_file
+
 
     def to_gpkg(self,
                 crs: str,

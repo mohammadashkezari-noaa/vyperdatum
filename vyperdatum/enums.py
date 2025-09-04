@@ -20,15 +20,9 @@ class PROJDB(RootEnum):
     ----------
     FILE_NAME
     """
-    # DIR = os.path.join(ASSETS.DIR.value, "datums")
     # DIR = pp.datadir.get_data_dir()
     DIR = os.environ.get("VYPER_GRIDS", None)
-    if DIR is None:
-        raise EnvironmentError("VYPER_GRIDS environment variable is not set. "
-                               "Please set it to the directory where the proj database "
-                               "and the grid file are located.")
     FILE_NAME = "proj.db"
-
     VIEW_CRS = "crs_view"
     TABLE_VERTICAL_CRS = "vertical_crs"
     TABLE_GRID_TRANS = "grid_transformation"

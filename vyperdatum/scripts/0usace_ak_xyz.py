@@ -31,10 +31,11 @@ if __name__ == "__main__":
     #         # {"crs_from": "EPSG:6319", "crs_to": "ESRI:102445"},
     #         ]
     steps = [
-            # {"crs_from": "ESRI:102445", "crs_to": "EPSG:6337"}  # UTM Zone 8N
-            {"crs_from": "ESRI:102445", "crs_to": "EPSG:6338"}  # UTM Zone 9N
+            {"crs_from": "ESRI:102445", "crs_to": "EPSG:6337"}  # UTM Zone 8N
+            # {"crs_from": "ESRI:102445", "crs_to": "EPSG:6338"}  # UTM Zone 9N
             ]
     
+    files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\point\USACE\PBA\UTM8N\Original\AK_01_CRA_20220520_CS\AK_01_CRA_20220520_CS_FULL.XYZ"]
 
     for i, input_file in enumerate(files[:]):
         print(f"{i+1}/{len(files)}: {input_file}")
@@ -44,16 +45,12 @@ if __name__ == "__main__":
                          crs_to=steps[-1]["crs_to"],
                          steps=steps
                          )
-        success, xt, yt, zt = tf.transform_points(x, y, z,
-                                                always_xy=True,
-                                                allow_ballpark=False,
-                                                only_best=True,
-                                                vdatum_check=False)
         output_file = input_file.replace("Original", "Manual")
-        pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
-        csv_fname = output_file+".csv"
-        tdf = pd.DataFrame({"x": xt, "y": yt, "z": zt})
-        # tdf.to_csv(csv_fname, index=False)
-        tdf['geometry'] = tdf.apply(lambda row: Point(row['x'], row['y'], row['z']), axis=1)
-        gdf = gpd.GeoDataFrame(tdf, geometry='geometry', crs=f'{steps[-1]["crs_to"]}')
-        gdf.to_file(f'{output_file.replace("XYZ", "gpkg")}', driver="GPKG")
+        tf.transform(input_file=input_file,
+                    output_file=output_file,
+                    pre_post_checks=True,
+                    vdatum_check=False,
+                    # negate_z=negate_z,
+                    # unit_conversion=0.3048006096
+                    )
+
