@@ -369,9 +369,9 @@ def multiple_geodetic_crs(steps: Optional[list[dict]]) -> bool:
     geodetics = []
     for step in steps:
         h = step["crs_from"].split("+")[0]
-        geodetics.append(":".join(pp.CRS(pp.CRS(h).geodetic_crs).to_authority()))
+        geodetics.append(":".join(pp.CRS(pp.CRS(h).geodetic_crs.to_2d()).to_authority()))
         h = step["crs_to"].split("+")[0]
-        geodetics.append(":".join(pp.CRS(pp.CRS(h).geodetic_crs).to_authority()))
+        geodetics.append(":".join(pp.CRS(pp.CRS(h).geodetic_crs.to_2d()).to_authority()))
     return len(set(geodetics)) != 1
 
 def multiple_projections(steps: Optional[list[dict]]) -> bool:
