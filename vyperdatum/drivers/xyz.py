@@ -194,7 +194,9 @@ class XYZ(Driver):
             output_file = str(Path(output_file).with_suffix(".npy"))
             out_npy = np.stack((self.df["x_t"].values,
                                 self.df["y_t"].values,
-                                self.df["z_t"].values), axis=1)
+                                self.df["z_t"].values,
+                                self.df["Uncertainty"].values
+                                ), axis=1)
             np.save(output_file, out_npy)
         except Exception as e:
             if os.path.isfile(output_file):
