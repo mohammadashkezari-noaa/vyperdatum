@@ -856,8 +856,9 @@ class Transformer():
                                        creationOptions=cop)
 
             output_ds = None
-            # overwrite the non-elevation bands with the original data            
-            overwrite_with_original(input_file, output_file, elevation_band)
+            if v_shift or crs_utils.crs_components(self.crs_from)[0] == crs_utils.crs_components(self.crs_to)[0]:
+                # overwrite the non-elevation bands with the original data            
+                overwrite_with_original(input_file, output_file, elevation_band)
             update_raster_wkt(output_file, to_wkt)
             apply_nbs_band_standards(output_file)
             input_metadata = raster_metadata(input_file)
