@@ -6,7 +6,7 @@
 [![Read the Docs](https://readthedocs.org/projects/vyperdatum/badge/?version=latest)](https://vyperdatum.readthedocs.io/en/latest/)
 
 ## Vyperdatum
-.
+
 **Vyperdatum** [definition] 
 
 ## Installation
