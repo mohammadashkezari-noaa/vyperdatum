@@ -9,8 +9,8 @@ import pyproj as pp
 
 if __name__ == "__main__":
 
-    parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC_mixed\Original\**\*.bag"
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC_mixed\Original\**\*.tiff"
+    parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC_mixed\Original\**\*.bag"
     # parent_dir = r"C:\Users\mohammad.ashkezari\Desktop\bag\Original\*.bag"
     files = glob.glob(parent_dir, recursive=True)[:]
     crs_from = "EPSG:32619+NOAA:101"

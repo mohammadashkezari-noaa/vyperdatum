@@ -10,7 +10,7 @@ import pyproj as pp
 from vyperdatum.utils.spatial_utils import overlapping_regions, overlapping_extents
 from vyperdatum.utils.crs_utils import commandline, pipeline_string, crs_components
 from vyperdatum.enums import VDATUM
-
+from vyperdatum.utils import crs_utils
 
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
