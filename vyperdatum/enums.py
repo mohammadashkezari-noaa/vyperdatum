@@ -2,6 +2,7 @@ import os
 import vyperdatum
 from enum import Enum
 import pyproj as pp
+from pathlib import Path
 
 
 class RootEnum(Enum):
@@ -22,7 +23,14 @@ class PROJDB(RootEnum):
     """
     # DIR = pp.datadir.get_data_dir()
     DIR = os.environ.get("VYPER_GRIDS", None)
+    if DIR is None:
+        raise ValueError("VYPER_GRIDS environment variable is not set.")
+    if not Path(DIR).is_dir():
+        raise NotADirectoryError(f"The directory specified by VYPER_GRIDS does not exist: {DIR}")
     FILE_NAME = "proj.db"
+    _projdb_path = Path()(DIR) / FILE_NAME.value
+    if not _projdb_path.is_file():
+        raise FileNotFoundError(f"The proj.db file does not exist in the directory specified by VYPER_GRIDS: {DIR}")
     VIEW_CRS = "crs_view"
     TABLE_VERTICAL_CRS = "vertical_crs"
     TABLE_GRID_TRANS = "grid_transformation"
