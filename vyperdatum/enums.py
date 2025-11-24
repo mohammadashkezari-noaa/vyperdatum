@@ -28,7 +28,7 @@ class PROJDB(RootEnum):
     if not Path(DIR).is_dir():
         raise NotADirectoryError(f"The directory specified by VYPER_GRIDS does not exist: {DIR}")
     FILE_NAME = "proj.db"
-    _projdb_path = Path()(DIR) / FILE_NAME.value
+    _projdb_path = Path(DIR) / FILE_NAME.value
     if not _projdb_path.is_file():
         raise FileNotFoundError(f"The proj.db file does not exist in the directory specified by VYPER_GRIDS: {DIR}")
     VIEW_CRS = "crs_view"

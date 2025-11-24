@@ -255,9 +255,9 @@ class Transformer():
             return success
 
     def transform_points(self,
-                         x: Union[float, int, list, np.ndarray],
-                         y: Union[float, int, list, np.ndarray],
-                         z: Union[float, int, list, np.ndarray],
+                         x: Union[list, np.ndarray],
+                         y: Union[list, np.ndarray],
+                         z: Union[list, np.ndarray],
                          always_xy: bool = False,
                          vdatum_check: bool = False,
                          area_of_interest: Optional[AreaOfInterest] = None,
@@ -274,11 +274,11 @@ class Transformer():
 
         Parameters
         ----------
-        x: numeric scalar or array
+        x: numeric array
            Input x coordinate(s).
-        y: numeric scalar or array
+        y: numeric array
            Input y coordinate(s).
-        z: numeric scalar or array, optional
+        z: numeric array, optional
            Input z coordinate(s).
         always_xy: bool, default=False
             If true, the transform method will accept as input and return as output

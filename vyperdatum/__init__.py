@@ -16,11 +16,6 @@ logger = logging.getLogger("root_logger")
 
 
 def validate_vyper_grids():
-    assert os.environ["VYPER_GRIDS"] == PROJDB.DIR.value
-    assert os.environ["PROJ_DATA"] == PROJDB.DIR.value, ("PROJ_DATA environment variable is not set to the correct directory. "
-                                                         "It should be set to the same directory specified by VYPER_GRIDS env variable.\n"
-                                                         f"Current PROJ_DATA env var: {os.environ['PROJ_DATA']}\n"
-                                                         f"Current VYPER_GRIDS env var: {os.environ['VYPER_GRIDS']}")
     dir_path = PROJDB.DIR.value
     if dir_path is None:
         raise EnvironmentError("VYPER_GRIDS environment variable is not set. "
@@ -29,12 +24,11 @@ def validate_vyper_grids():
 
     if not os.path.exists(dir_path):
         raise FileNotFoundError(f"The directory specified by VYPER_GRIDS environment variable does not exist: {dir_path}")
-
-    if not os.path.exists(os.path.join(dir_path, PROJDB.FILE_NAME.value)):
-        raise FileNotFoundError(f"The proj.db file does not exist in the directory specified by VYPER_GRIDS: {dir_path}")
-
-    if not os.path.exists(os.path.join(dir_path, PROJDB.FILE_NAME.value)):
-        raise FileNotFoundError(f"The proj.db file does not exist in the directory specified by VYPER_GRIDS: {dir_path}")
+    assert os.environ["VYPER_GRIDS"] == PROJDB.DIR.value
+    assert os.environ["PROJ_DATA"] == PROJDB.DIR.value, ("PROJ_DATA environment variable is not set to the correct directory. "
+                                                         "It should be set to the same directory specified by VYPER_GRIDS env variable.\n"
+                                                         f"Current PROJ_DATA env var: {os.environ['PROJ_DATA']}\n"
+                                                         f"Current VYPER_GRIDS env var: {os.environ['VYPER_GRIDS']}")
 
     selected_grid_files = [
         "us_noaa_nos_underkeel_hydroid-NAD83(2011)_2010.0_(nwldatum_4.7.0_20240621).tif",

@@ -409,37 +409,6 @@ def multiple_projections(steps: Optional[list[dict]]) -> bool:
             projs.append(_projection_type(c))
     return len(set(projs)) > 1
 
-def commandline(command: str,
-                args: Optional[list[str]] = None) -> tuple[Optional[dict], Optional[str]]:
-    """
-    Spawn a new process to run a commandline utility and capture its output.
-
-    Parameters
-    -----------
-    command: str
-        The name of command (utility) to run. Example: `projinfo`
-    args: Optional[list[str]]
-        Optional arguments.
-
-    Returns
-    --------
-    stdout: Optional[dict], std_err: Optional[str]
-        standard output and error.
-    """
-    try:
-        sout, serr = dict({}), None
-        resp = subprocess.run([command, *args],
-                              stderr=subprocess.PIPE,
-                              stdout=subprocess.PIPE
-                              )
-        sout = resp.stdout.decode() if resp.stdout else None
-        serr = resp.stderr.decode() if resp.stderr else None
-    except Exception as e:
-        logger.exception(str(e))
-        sout, serr = dict({}), None
-    return sout, serr
-
-
 def pipeline_string(crs_from: str, crs_to, input_metadata=None) -> Optional[str]:
     """
     Extract PROJ pipeline string from the output of projinfo utility.
