@@ -244,9 +244,6 @@ def single_subgrid_point_transform(fname: str,
     """
     try:
         start, x, y, z = get_subgrid_points(fname, i, j)
-        print("\n\n>>>>>>>>>>>>>>>>>>>>>\n\n")
-        print(start, x, y, z
-              )
         _, _, _, zz = tf.transform_points(x, y, z)
         zz = np.where(z == nodata_value, z, zz)
     except Exception as e:
@@ -565,10 +562,7 @@ def update_vr_refinements(fname: str,
     ----------
     None
     """
-    
-    print("\n\n\nUpdating varres_refinements layer...\n\n\n")
-
-
+    print("\nUpdating varres_refinements layer...\n")
     bag = h5py.File(fname, "r+")
     root = bag.require_group("/BAG_root")
     vr_ref = root["varres_refinements"]
