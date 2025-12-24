@@ -799,7 +799,7 @@ class Transformer():
                                outputType=gdal.gdalconst.GDT_Float32,
                                warpOptions=wopt,
                                errorThreshold=0,
-                               
+
                                xRes=xres,
                                yRes=yres,
                                outputBounds=input_metadata["extent"],
@@ -851,11 +851,22 @@ class Transformer():
             cop = ["COMPRESS=DEFLATE"]
             if input_metadata["driver"].lower() == "gtiff":
                 cop.append("TILED=YES")
+            if input_metadata["driver"].lower() == "bag":
+                try:
+                    block_size = min(int(input_metadata["block_size"][0][0]),
+                                     int(input_metadata["block_size"][0][1]))  # take the smaller block size (x, y)
+                    cop.append(f"BLOCK_SIZE={block_size}")
+                except Exception as e:
+                    logger.warning("Could not parse block size from input raster metadata. "
+                                   f"Found invalid block_size value: {input_metadata['block_size'][0]}."
+                                   f"\n Exception: {str(e)}")
+
             output_ds = gdal.Translate(output_file, ds, format=input_metadata["driver"],
                                        outputType=gdal.GDT_Float32,
                                        creationOptions=cop)
 
             output_ds = None
+            ds = None
             if v_shift or crs_utils.crs_components(self.crs_from)[0] == crs_utils.crs_components(self.crs_to)[0]:
                 # overwrite the non-elevation bands with the original data            
                 overwrite_with_original(input_file, output_file, elevation_band)

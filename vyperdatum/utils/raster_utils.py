@@ -47,6 +47,8 @@ def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
         metadata |= {"dimensions": f"{ds.RasterXSize} x {ds.RasterYSize}"}
         metadata |= {"band_no_data": [ds.GetRasterBand(i+1).GetNoDataValue()
                                       for i in range(ds.RasterCount)]}
+        metadata |= {"block_size": [ds.GetRasterBand(i+1).GetBlockSize()
+                                      for i in range(ds.RasterCount)]}
         metadata |= {"band_descriptions": [ds.GetRasterBand(i+1).GetDescription()
                                            for i in range(ds.RasterCount)]}
         # metadata |= {"band_stats": [band_stats(ds.GetRasterBand(i+1).ReadAsArray())
@@ -467,9 +469,13 @@ def update_raster_wkt(input_file: str, wkt: str) -> None:
     if drv == "BAG":
         tmp_out = input_file + ".tmp.bag"
 
+        ds_bs = gdal.Open(input_file)
+        bs = min(ds_bs.GetRasterBand(1).GetBlockSize())
+        ds_bs = None
+
         # Build gdal.Translate options equivalent to: -of BAG -a_srs "<wkt>"
         topts = gdal.TranslateOptions(
-            options=["-of", "BAG", "-a_srs", wkt]
+            options=["-of", "BAG", "-a_srs", wkt, "-co", f"BLOCK_SIZE={bs}"]
         )
         out = gdal.Translate(tmp_out, ds, options=topts)
         if out is None:

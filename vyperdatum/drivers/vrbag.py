@@ -18,6 +18,7 @@ from io import BytesIO
 from lxml import etree
 from tqdm.auto import tqdm
 from osgeo import gdal
+from pyproj.enums import WktVersion
 from vyperdatum.utils.raster_utils import raster_metadata
 from vyperdatum.enums import VRBAG as vrb_enum
 
@@ -520,7 +521,9 @@ def change_corner_points_and_wkt(fname: str,
     gco = ".//{" + root.nsmap['gco'] + "}"
     root.find(f"{gml}coordinates").text = new_points
     root.findall(f"{gco}CharacterString")[6].text = wkt_h
+    root.findall(f"{gco}CharacterString")[7].text = "WKT"
     root.findall(f"{gco}CharacterString")[8].text = wkt_v
+    root.findall(f"{gco}CharacterString")[9].text = "WKT"
     # tree.write(xml_fname)
     # xml = etree.tostring(root, pretty_print=True).decode("ascii")
     xmet = etree.tostring(root).decode()
@@ -599,13 +602,12 @@ def update_vr_refinements(fname: str,
     _, x2, y2, _ = tf.transform_points([y2], [x2], [0], always_xy=False, allow_ballpark=False)
 
 
-
-
+    # using old WKT1_GDAL for compatibility with older GDAL/QGIS
     if tf.crs_to.is_compound:
-        wkt_h = tf.crs_to.sub_crs_list[0].to_wkt()
-        wkt_v = tf.crs_to.sub_crs_list[1].to_wkt()
+        wkt_h = tf.crs_to.sub_crs_list[0].to_wkt(version=WktVersion.WKT1_GDAL)
+        wkt_v = tf.crs_to.sub_crs_list[1].to_wkt(version=WktVersion.WKT1_GDAL)
     else:
-        wkt_h = tf.crs_to.to_wkt()
+        wkt_h = tf.crs_to.to_wkt(version=WktVersion.WKT1_GDAL)
         wkt_v = ""
     wkt_h = wkt_h if wkt_h else ""
     wkt_v = wkt_v if wkt_v else ""

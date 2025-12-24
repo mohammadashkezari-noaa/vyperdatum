@@ -13,6 +13,9 @@ if __name__ == "__main__":
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC_mixed\Original\**\*.bag"
     # parent_dir = r"C:\Users\mohammad.ashkezari\Desktop\bag\Original\*.bag"
     files = glob.glob(parent_dir, recursive=True)[:]
+    files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC_mixed\Original\E01096\E01096_MB_4m_MLLW_7of7_clipped.bag"]
+    files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC_mixed\Original\E01096\clipped.bag"]
+    files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC_mixed\Original\E01096\E01096_MB_4m_MLLW_7of7.bag"]
     crs_from = "EPSG:32619+NOAA:101"
     crs_to = "EPSG:6348+NOAA:101"
     # steps = [{'crs_from': 'EPSG:32619', 'crs_to': 'EPSG:9755', 'v_shift': False},

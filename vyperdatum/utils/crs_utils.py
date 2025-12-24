@@ -30,14 +30,28 @@ def crs_components(crs: pp.CRS, raise_no_auth: bool = True) -> Tuple[str, Option
     h, v = None, None
     if crs.is_compound:
         try:
-            h = ":".join(pp.CRS(crs.sub_crs_list[0]).to_authority())
+            sub_h = pp.CRS(crs.sub_crs_list[0])
+            # if sub_h.is_bound:
+            #     sub_h = sub_h.source_crs
+            h = ":".join(sub_h.to_authority())
         except:
-            h = "UnknownAuthorityCode"
+            if sub_h.is_bound:
+                h = "BOUNDCRS"
+            else:
+                h = "UnknownAuthorityCode"
         try:
-            v = ":".join(pp.CRS(crs.sub_crs_list[1]).to_authority())
+            sub_v = pp.CRS(crs.sub_crs_list[1])
+            # if sub_v.is_bound:
+            #     sub_v = sub_v.source_crs
+            v = ":".join(sub_v.to_authority())
         except:
-            v = "UnknownAuthorityCode"
+            if sub_v.is_bound:
+                v = "BOUNDCRS"
+            else:
+                v = "UnknownAuthorityCode"
     else:
+        # if crs.is_bound:
+        #     crs = crs.source_crs
         ac = crs.to_authority(min_confidence=100)
         if not ac and raise_no_auth:
             raise ValueError(f"Unable to produce authority name and code for this crs:\n{crs}")
