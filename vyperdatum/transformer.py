@@ -20,7 +20,7 @@ from vyperdatum.utils.raster_utils import (raster_metadata,
                                            update_raster_wkt,
                                            overwrite_with_original,
                                            apply_nbs_band_standards,
-                                           create_cutline_from_grid)
+                                           )
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
 from vyperdatum.drivers import vrbag, laz, npz, pdal_based, gparq, xyz
 from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
