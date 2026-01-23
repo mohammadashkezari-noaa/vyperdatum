@@ -3,9 +3,9 @@ import pathlib
 import logging
 import json
 import tempfile
-from osgeo import gdal
+from osgeo import gdal, osr, ogr
 import numpy as np
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 import pyproj as pp
 from vyperdatum.utils.spatial_utils import overlapping_regions, overlapping_extents
 from vyperdatum.utils.crs_utils import commandline, pipeline_string, crs_components
@@ -504,89 +504,134 @@ def update_raster_wkt(input_file: str, wkt: str) -> None:
     return
 
 
-def overwrite_with_original(input_file: str,
-                            output_file: str,
-                            elevation_band: int = None
-                            ) -> None:
+def overwrite_with_original(input_file: str, output_file: str) -> None:
     """
-    Overwrite the non-elevation bands in the output file with
-    the original input file band arrays. Currently, we assume that the elevation
-    band is the first band in the input file. The other bands are assumed to be
-    the same as the input file.
-
-    Parameters
-    ----------
-    input_file: str
-        Absolute path to the input raster file.
-    output_file: str
-        Absolute path to the output raster file.
-    elevation_band: int, optional
-        The index of the elevation band in the input file. If not provided,
-        the the index of a band named 'elevation' or 'dem' will be used. Raise exception,
-        If no such band name is found.
-
-    Raises
-    ----------
-    ValueError:
-        If the elevation band is not found.
-
+    Overwrite the non-elevation bands in the output file with the original input
+    file band arrays. If an uncertainty band exists, it will be masked so that
+    uncertainty is only present where elevation is valid (not NoData).
     """
     ds_in = gdal.Open(input_file, gdal.GA_ReadOnly)
+    if ds_in is None:
+        raise ValueError(f"Failed to open input_file: {input_file}")
+
     if ds_in.RasterCount < 2:
+        ds_in = None
         return
+
+    elevation_band, uncertainty_band = None, None
+    for i in range(1, ds_in.RasterCount + 1):
+        band = ds_in.GetRasterBand(i)
+        desc = (band.GetDescription() or "").strip().lower()
+        if desc in ["elevation", "dem"]:
+            elevation_band = i
+        if desc in ["uncertainty", "tvu"]:
+            uncertainty_band = i
+
     if elevation_band is None:
-        band_count = ds_in.RasterCount
-        for i in range(1, band_count + 1):
-            band = ds_in.GetRasterBand(i)
-            if band.GetDescription().lower() in ["elevation", "dem"]:
-                elevation_band = i
-                break
-    if elevation_band is None:
-        raise ValueError("No elevation band found in the input raster file. "
-                         "Please provide the index of the elevation band.")
+        ds_in = None
+        raise ValueError(
+            "No elevation band found in the input raster file. "
+            "Please provide the index of the elevation band."
+        )
+
     ds_out = gdal.Open(output_file, gdal.GA_ReadOnly)
+    if ds_out is None:
+        ds_in = None
+        raise ValueError(f"Failed to open output_file: {output_file}")
+
     input_metadata = raster_metadata(input_file)
-    # combine the vertically transformed bands and
-    # the non-transformed ones into a new raster
     driver = gdal.GetDriverByName(input_metadata["driver"])
+
     mem_path = f"/vsimem/{os.path.splitext(os.path.basename(output_file))[0]}.tiff"
-    ds_temp = driver.Create(mem_path,
-                            ds_in.RasterXSize,
-                            ds_in.RasterYSize,
-                            ds_in.RasterCount,
-                            gdal.GDT_Float32
-                            )
+    ds_temp = driver.Create(
+        mem_path,
+        ds_in.RasterXSize,
+        ds_in.RasterYSize,
+        ds_in.RasterCount,
+        gdal.GDT_Float32
+    )
     ds_temp.SetGeoTransform(ds_out.GetGeoTransform())
     ds_temp.SetProjection(ds_out.GetProjection())
-    for b in range(1, ds_in.RasterCount+1):
-        if b == elevation_band:
-            out_shape = ds_out.GetRasterBand(b).ReadAsArray().shape
-            in_shape = ds_in.GetRasterBand(b).ReadAsArray().shape
-            if out_shape != in_shape:
-                logger.error(f"Band {b} dimensions has changed from"
-                             f"{in_shape} to {out_shape}")
-            ds_temp.GetRasterBand(b).SetDescription(ds_out.GetRasterBand(b).GetDescription())
-            ds_temp.GetRasterBand(b).SetNoDataValue(ds_out.GetRasterBand(b).GetNoDataValue())
-            ds_temp.GetRasterBand(b).WriteArray(ds_out.GetRasterBand(b).ReadAsArray())
+
+    # --- Read elevation (from ds_out) once and build a validity mask ---
+    elev_out_band = ds_out.GetRasterBand(elevation_band)
+    elev_arr = elev_out_band.ReadAsArray()
+    elev_nodata = elev_out_band.GetNoDataValue()
+
+    if elev_nodata is None:
+        # Fall back: treat non-finite as invalid
+        valid_elev = np.isfinite(elev_arr)
+    else:
+        if np.isnan(elev_nodata):
+            valid_elev = ~np.isnan(elev_arr)
         else:
-            ds_temp.GetRasterBand(b).SetDescription(ds_in.GetRasterBand(b).GetDescription())
-            # ds_temp.GetRasterBand(b).SetNoDataValue(ds_in.GetRasterBand(b).GetNoDataValue())
-            ds_temp.GetRasterBand(b).WriteArray(ds_in.GetRasterBand(b).ReadAsArray())
+            valid_elev = (elev_arr != elev_nodata) & np.isfinite(elev_arr)
+
+    # --- Write all bands; mask uncertainty where elevation is invalid ---
+    for b in range(1, ds_in.RasterCount + 1):
+        out_band = ds_temp.GetRasterBand(b)
+
+        if b == elevation_band:
+            # Write transformed elevation from ds_out
+            out_band.SetDescription("elevation")
+            if elev_nodata is not None:
+                out_band.SetNoDataValue(float(elev_nodata))
+            out_band.WriteArray(elev_arr.astype(np.float32, copy=False))
+
+        elif uncertainty_band is not None and b == uncertainty_band:
+            in_unc_band = ds_in.GetRasterBand(b)
+            unc_arr = in_unc_band.ReadAsArray().astype(np.float32, copy=False)
+
+            # Choose an output NoData for uncertainty
+            unc_nodata_in = in_unc_band.GetNoDataValue()
+            if unc_nodata_in is not None:
+                unc_nodata_out = float(unc_nodata_in)
+            elif elev_nodata is not None and np.isfinite(elev_nodata):
+                unc_nodata_out = float(elev_nodata)
+            else:
+                unc_nodata_out = -9999.0
+
+            # Mask uncertainty wherever elevation is NoData
+            unc_masked = np.array(unc_arr, copy=True)
+            unc_masked[~valid_elev] = unc_nodata_out
+
+            out_band.SetDescription("uncertainty")
+            out_band.SetNoDataValue(unc_nodata_out)
+            out_band.WriteArray(unc_masked)
+
+        else:
+            # Copy any other non-elevation bands from the input (mask at no elevation points)
+            in_band = ds_in.GetRasterBand(b)
+            arr = in_band.ReadAsArray()
+            if elev_nodata is not None and np.isfinite(elev_nodata):
+                unc_nodata_out = float(elev_nodata)
+            else:
+                unc_nodata_out = -9999.0
+            arr_masked = np.array(arr, copy=True)
+            arr_masked[~valid_elev] = unc_nodata_out
+            out_band.SetDescription(in_band.GetDescription())
+            nd = in_band.GetNoDataValue()
+            if nd is not None:
+                out_band.SetNoDataValue(float(nd))
+            out_band.WriteArray(arr_masked.astype(np.float32, copy=False))
+
     ds_in, ds_out = None, None
     ds_temp.FlushCache()
-    driver.CreateCopy(output_file, ds_temp)
 
     cop = ["COMPRESS=DEFLATE"]
     if input_metadata["driver"].lower() == "gtiff":
         cop.extend(["TILED=YES"])
 
-    gdal.Translate(output_file, ds_temp, format=input_metadata["driver"],
-                   outputType=gdal.GDT_Float32,
-                   creationOptions=cop)     
+    gdal.Translate(
+        output_file,
+        ds_temp,
+        format=input_metadata["driver"],
+        outputType=gdal.GDT_Float32,
+        creationOptions=cop
+    )
 
     ds_temp = None
     gdal.Unlink(mem_path)
-    return
 
 
 def update_stats(input_file):
@@ -722,7 +767,7 @@ def apply_nbs_band_standards(input_file: str) -> None:
     if ds.GetDriver().ShortName.lower() != "gtiff":
         return
     
-    apply_nbs_bandnames(input_file)
+    # apply_nbs_bandnames(input_file)
     add_uncertainty_band(input_file)
     update_stats(input_file)
     return

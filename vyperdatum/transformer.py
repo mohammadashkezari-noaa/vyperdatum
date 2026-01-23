@@ -19,7 +19,8 @@ from vyperdatum.utils import raster_utils, crs_utils, drivers_utils
 from vyperdatum.utils.raster_utils import (raster_metadata,
                                            update_raster_wkt,
                                            overwrite_with_original,
-                                           apply_nbs_band_standards)
+                                           apply_nbs_band_standards,
+                                           create_cutline_from_grid)
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
 from vyperdatum.drivers import vrbag, laz, npz, pdal_based, gparq, xyz
 from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
@@ -721,13 +722,13 @@ class Transformer():
         finally:
             return success
 
+    ################################################ 2-PASS WARP, INIT_DEST=NO_DATA ################################################
     def transform_raster(self,
                          input_file: str,
                          output_file: str,
                          overview: bool = False,
                          pre_post_checks: bool = True,
-                         vdatum_check: bool = True,
-                         elevation_band: Optional[int] = None
+                         vdatum_check: bool = True
                          ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
@@ -754,10 +755,6 @@ class Transformer():
         vdatum_check: bool, default=True
             If True, a random sample of the transformed data are compared with transformation
             outcomes produced by Vdatum REST API.
-        elevation_band: Optional[int], default=None
-            The index of the elevation band in the input file. If not provided,
-            the the index of a band named 'elevation' or 'dem' will be used. Raise exception,
-            If no such band name is found.
 
 
         Returns
@@ -789,7 +786,7 @@ class Transformer():
                 geotransform = input_ds.GetGeoTransform()
                 xres, yres = geotransform[1], geotransform[5]
 
-            wopt = ["SAMPLE_GRID=YES", "SAMPLE_STEPS=ALL"]
+            wopt = ["SAMPLE_GRID=YES", "SAMPLE_STEPS=ALL", "INIT_DEST=NO_DATA"]
             if v_shift:
                 wopt.append("APPLY_VERTICAL_SHIFT=YES")
             if crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps):
@@ -808,15 +805,33 @@ class Transformer():
                                )
             else:
                 # logger.info("Setting res and extent options in gdal Warp.")
-                ds = gdal.Warp(output_vrt, input_file, format="vrt",
+                temp_vrt = str(output_vrt).replace('.vrt', '_temp.vrt')
+                ds_temp = gdal.Warp(temp_vrt, input_file, format="vrt",
                                outputType=gdal.gdalconst.GDT_Float32,
                                warpOptions=wopt,
-                               errorThreshold=0,
+                               errorThreshold=0.125,
+                               xRes=xres,
+                               yRes=yres,
+                            #    outputBounds=input_metadata["extent"],
+                               coordinateOperation=pipe
+                               )
+                if ds_temp is None:
+                    logger.error(f"First pass warp failed: {gdal.GetLastErrorMsg()}")
+                    return False
+                ds = gdal.Warp(output_vrt, temp_vrt, format="vrt",
+                               outputType=gdal.gdalconst.GDT_Float32,
+                               warpOptions=wopt,
+                               errorThreshold=0.125,
                                xRes=xres,
                                yRes=yres,
                                outputBounds=input_metadata["extent"],
-                               coordinateOperation=pipe
+                               srcNodata=-9999.0,
+                               dstNodata=-9999.0,
+                               resampleAlg="near"
                                )
+                ds_temp = None
+                if os.path.exists(temp_vrt):
+                    os.remove(temp_vrt)                
             pipe = re.sub(r"\s{2,}", " ", pipe).strip()
             to_wkt = self.crs_to.to_wkt()
             to_wkt = re.sub(r"\s{2,}", " ", to_wkt).strip()
@@ -868,8 +883,8 @@ class Transformer():
             output_ds = None
             ds = None
             if v_shift or crs_utils.crs_components(self.crs_from)[0] == crs_utils.crs_components(self.crs_to)[0]:
-                # overwrite the non-elevation bands with the original data            
-                overwrite_with_original(input_file, output_file, elevation_band)
+                # overwrite the non-elevation/uncertainty bands with the original data            
+                overwrite_with_original(input_file, output_file)
             update_raster_wkt(output_file, to_wkt)
             apply_nbs_band_standards(output_file)
             input_metadata = raster_metadata(input_file)
@@ -922,6 +937,7 @@ class Transformer():
             if os.path.isfile(output_vrt):
                 os.remove(output_vrt)            
             return success
+
 
     def transform_vector(self,
                          input_file: str,

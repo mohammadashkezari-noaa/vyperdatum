@@ -105,7 +105,13 @@ if __name__ == "__main__":
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem"
     files = get_tiff_files(parent_dir, extention=".tif")
     
-    # files = [r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\FL1812-TB-N\2018_315000e_3080000n_tpu.tif"]
+    files = [
+        # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_525000e_2780000n_tpu.tif",
+        r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_525000e_2785000n_tpu.tif",
+        # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_530000e_2785000n_tpu.tif",
+        # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_535000e_2775000n_tpu.tif",
+        # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_550000e_2785000n_tpu.tif",
+        ]
     crs_from = "EPSG:6346"
     crs_to = "EPSG:6346+NOAA:98"
 
@@ -121,8 +127,9 @@ if __name__ == "__main__":
                         #  steps=steps
                          )
         
-        prc_file = input_file.replace("Original", "Processed")
-        remove_second_band(src_path=input_file, dst_path=prc_file)
+        prc_file = input_file
+        # prc_file = input_file.replace("Original", "Processed")
+        # remove_second_band(src_path=input_file, dst_path=prc_file)
         output_file = input_file.replace("Original", "Manual")
         tf.transform_raster(input_file=prc_file,
                             output_file=output_file,
