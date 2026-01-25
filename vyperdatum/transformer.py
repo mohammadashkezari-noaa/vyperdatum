@@ -20,7 +20,7 @@ from vyperdatum.utils.raster_utils import (raster_metadata,
                                            update_raster_wkt,
                                            overwrite_with_original,
                                            apply_nbs_band_standards,
-                                           )
+                                           create_cutline_from_grid)
 from vyperdatum.utils.vdatum_rest_utils import vdatum_cross_validate
 from vyperdatum.drivers import vrbag, laz, npz, pdal_based, gparq, xyz
 from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
@@ -722,7 +722,6 @@ class Transformer():
         finally:
             return success
 
-    ################################################ 2-PASS WARP, INIT_DEST=NO_DATA ################################################
     def transform_raster(self,
                          input_file: str,
                          output_file: str,
@@ -765,19 +764,24 @@ class Transformer():
         def steps_to_concat_pipe(steps, input_metadata):
             concat_pipe = "+proj=pipeline "
             v_shift = False
+            grid_files = []  # Track grid files used
             for step in steps:
                 pipe = crs_utils.pipeline_string(step["crs_from"], step["crs_to"], input_metadata)
                 concat_pipe = f"{concat_pipe} {pipe.split('+proj=pipeline')[1]}"
                 if step["v_shift"]:
                     v_shift = True
-            return concat_pipe, v_shift
+                    # Extract grid file from pipeline string
+                    match = re.search(r'\+grids=([^\s]+)', pipe)
+                    if match:
+                        grid_files.append(match.group(1))
+            return concat_pipe, v_shift, grid_files
 
         self._validate_input_file(input_file)
         try:
             success = False
             pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             input_metadata = raster_metadata(input_file)
-            pipe, v_shift = steps_to_concat_pipe(self.steps, input_metadata)
+            pipe, v_shift, grid_files = steps_to_concat_pipe(self.steps, input_metadata)
 
             logger.info(f"Transformation Steps: {self.steps}")
             logger.info(f"Concatenated PROJ pipeline:\n{pipe}\n")
@@ -786,52 +790,59 @@ class Transformer():
                 geotransform = input_ds.GetGeoTransform()
                 xres, yres = geotransform[1], geotransform[5]
 
-            wopt = ["SAMPLE_GRID=YES", "SAMPLE_STEPS=ALL", "INIT_DEST=NO_DATA"]
+
+
+            # Create cutline if vertical shift and NWLD grids are involved, otherwise return None
+            # TODO: what if more than one NWLD grids are involved?
+            cutline_path = raster_utils.create_cutline_file(v_shift, grid_files,
+                                                            cutline_path=str(Path(output_file).parent / f"{Path(output_file).stem}_cutline.gpkg"),
+                                                            input_metadata=input_metadata)
+
+
+            wopt = ["SAMPLE_GRID=YES", "SAMPLE_STEPS=ALL"]
             if v_shift:
                 wopt.append("APPLY_VERTICAL_SHIFT=YES")
-            if crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps):
-                # remove res and extent options when multiple geodetic CRS or multiple projects are involved
-                # logger.info("Multiple geodetic CRS or projections detected, skipping res and extent options in gdal Warp.")
-                ds = gdal.Warp(output_vrt, input_file, format="vrt",
-                               outputType=gdal.gdalconst.GDT_Float32,
-                               warpOptions=wopt,
-                               errorThreshold=0,
 
-                               xRes=xres,
-                               yRes=yres,
-                               outputBounds=input_metadata["extent"],
+            if cutline_path:
+                # if cutline is created, clip input raster to the underlying grid to avoid gdal/warp failures
+                input_file = raster_utils.clip_raster_to_cutline(input_file, cutline_path,
+                                                                 output_path=str(Path(output_file).parent / f"{Path(output_file).stem}_cut_to_grid{Path(output_file).suffix}"))
+                input_file_cut = input_file
+                input_metadata = raster_metadata(input_file)
 
-                               coordinateOperation=pipe
-                               )
+                warp_kwargs = {
+                    "format": "vrt",
+                    "outputType": gdal.gdalconst.GDT_Float32,
+                    "warpOptions": wopt,
+                    "errorThreshold": 0,
+                    "xRes": abs(xres),
+                    "yRes": abs(yres),
+                    "cutlineDSName": cutline_path,
+                    "cropToCutline": True,
+                    "coordinateOperation": pipe,
+                    "dstNodata": -9999.0,
+                }
+                if not (crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps)):
+                    warp_kwargs["outputBounds"] = input_metadata["extent"]
+
+                ds = gdal.Warp(output_vrt, input_file, **warp_kwargs)             
+
             else:
-                # logger.info("Setting res and extent options in gdal Warp.")
-                temp_vrt = str(output_vrt).replace('.vrt', '_temp.vrt')
-                ds_temp = gdal.Warp(temp_vrt, input_file, format="vrt",
-                               outputType=gdal.gdalconst.GDT_Float32,
-                               warpOptions=wopt,
-                               errorThreshold=0.125,
-                               xRes=xres,
-                               yRes=yres,
-                            #    outputBounds=input_metadata["extent"],
-                               coordinateOperation=pipe
-                               )
-                if ds_temp is None:
-                    logger.error(f"First pass warp failed: {gdal.GetLastErrorMsg()}")
-                    return False
-                ds = gdal.Warp(output_vrt, temp_vrt, format="vrt",
-                               outputType=gdal.gdalconst.GDT_Float32,
-                               warpOptions=wopt,
-                               errorThreshold=0.125,
-                               xRes=xres,
-                               yRes=yres,
-                               outputBounds=input_metadata["extent"],
-                               srcNodata=-9999.0,
-                               dstNodata=-9999.0,
-                               resampleAlg="near"
-                               )
-                ds_temp = None
-                if os.path.exists(temp_vrt):
-                    os.remove(temp_vrt)                
+                # Prepare warp parameters
+                warp_kwargs = {
+                    "format": "vrt",
+                    "outputType": gdal.gdalconst.GDT_Float32,
+                    "warpOptions": wopt,
+                    "errorThreshold": 0,
+                    "xRes": abs(xres),
+                    "yRes": abs(yres),
+                    "coordinateOperation": pipe,
+                    "dstNodata": -9999.0
+                }
+                if not (crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps)):
+                    warp_kwargs["outputBounds"] = input_metadata["extent"]
+                ds = gdal.Warp(output_vrt, input_file, **warp_kwargs)
+
             pipe = re.sub(r"\s{2,}", " ", pipe).strip()
             to_wkt = self.crs_to.to_wkt()
             to_wkt = re.sub(r"\s{2,}", " ", to_wkt).strip()
@@ -880,11 +891,15 @@ class Transformer():
                                        outputType=gdal.GDT_Float32,
                                        creationOptions=cop)
 
+            if not os.path.exists(output_file):
+                logger.error(f"Output raster was not created: {output_file}")
+                logger.error(f"GDAL last error: {gdal.GetLastErrorMsg()}")
+                return False
+
             output_ds = None
             ds = None
-            if v_shift or crs_utils.crs_components(self.crs_from)[0] == crs_utils.crs_components(self.crs_to)[0]:
-                # overwrite the non-elevation/uncertainty bands with the original data            
-                overwrite_with_original(input_file, output_file)
+
+            overwrite_with_original(input_file, output_file)
             update_raster_wkt(output_file, to_wkt)
             apply_nbs_band_standards(output_file)
             input_metadata = raster_metadata(input_file)
@@ -929,15 +944,22 @@ class Transformer():
             #                               compression=input_metadata["compression"]
             #                               )
             #     # raster_utils.add_rat(output_file)
+
+            # Clean up cutline artifacts
+            if cutline_path and os.path.exists(cutline_path):
+                try:
+                    os.remove(cutline_path)
+                    os.remove(input_file_cut)
+                except Exception as e:
+                    logger.warning(f"Could not remove temporary cutline-related artifacts: {e}")
         except Exception as e:
-                efile = open(Path(output_file).parent.absolute()/Path(f"{os.path.split(input_file)[1]}_error.txt"), "w")
-                efile.write(str(e))
-                efile.close()
+            efile = open(Path(output_file).parent.absolute()/Path(f"{os.path.split(input_file)[1]}_error.txt"), "w")
+            efile.write(str(e))
+            efile.close()
         finally:
             if os.path.isfile(output_vrt):
-                os.remove(output_vrt)            
+                os.remove(output_vrt)
             return success
-
 
     def transform_vector(self,
                          input_file: str,
