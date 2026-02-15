@@ -335,7 +335,7 @@ def validate_transform_steps_dict(steps: Optional[list[dict]]) -> bool:
                                   allow_ballpark=False,
                                   )
             # pyproj doesn't return proj string when there are more than 1 transformers
-            if len(tg.transformers) < 2:
+            if len(tg.transformers) < 2:               
                 if len(tg.transformers) == 0:
                     err_msg = (f"{Fore.RED}No transformers identified for the following "
                                f"transformation:\n\tcrs_from: {steps[i]['crs_from']}\n\tcrs_to: {steps[i]['crs_to']}")

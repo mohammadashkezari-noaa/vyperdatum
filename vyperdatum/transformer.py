@@ -264,7 +264,7 @@ class Transformer():
                          area_of_interest: Optional[AreaOfInterest] = None,
                          authority: Optional[str] = None,
                          accuracy: Optional[float] = None,
-                         allow_ballpark: Optional[bool] = False,
+                         allow_ballpark: Optional[bool] = True,
                          force_over: bool = False,
                          only_best: Optional[bool] = True
                          ) -> tuple[Optional[Union[list, np.ndarray]],
@@ -302,7 +302,7 @@ class Transformer():
         accuracy: float, optional
             The minimum desired accuracy (in metres) of the candidate
             coordinate operations.
-        allow_ballpark: bool, optional, default=False
+        allow_ballpark: bool, optional, default=True
             Set to False to disallow the use of Ballpark transformation
             in the candidate coordinate operations. Default is to allow.
         force_over: bool, default=False
