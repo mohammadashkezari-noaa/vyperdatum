@@ -1,10 +1,14 @@
 import os
+import re
+import sys
+import io
 import pathlib
 import logging
 import json
 import math
 import tempfile
 from pathlib import Path
+from importlib.metadata import version
 from osgeo import gdal, osr, ogr
 import numpy as np
 import subprocess
@@ -576,7 +580,7 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
 
         if b == elevation_band:
             # Write transformed elevation from ds_out
-            out_band.SetDescription("elevation")
+            out_band.SetDescription("Elevation")
             if elev_nodata is not None:
                 out_band.SetNoDataValue(float(elev_nodata))
             out_band.WriteArray(elev_arr.astype(np.float32, copy=False))
@@ -592,13 +596,13 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
             elif elev_nodata is not None and np.isfinite(elev_nodata):
                 unc_nodata_out = float(elev_nodata)
             else:
-                unc_nodata_out = -9999.0
+                unc_nodata_out = input_metadata["band_no_data"][0]
 
             # Mask uncertainty wherever elevation is NoData
             unc_masked = np.array(unc_arr, copy=True)
             unc_masked[~valid_elev] = unc_nodata_out
 
-            out_band.SetDescription("uncertainty")
+            out_band.SetDescription("Uncertainty")
             out_band.SetNoDataValue(unc_nodata_out)
             out_band.WriteArray(unc_masked)
 
@@ -609,7 +613,7 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
             if elev_nodata is not None and np.isfinite(elev_nodata):
                 unc_nodata_out = float(elev_nodata)
             else:
-                unc_nodata_out = -9999.0
+                unc_nodata_out = input_metadata["band_no_data"][0]
             arr_masked = np.array(arr, copy=True)
             arr_masked[~valid_elev] = unc_nodata_out
             out_band.SetDescription(in_band.GetDescription())
@@ -922,10 +926,11 @@ def create_cutline_from_grid(grid_path: str,
         gdal.UseExceptions()
         ogr.UseExceptions()
 
+        overlap_pct = None
         container = gdal.Open(grid_path)
         if container is None:
             _log("error", f"Could not open grid: {grid_path}")
-            return None
+            return None, None
 
         candidates = []
         subdatasets = container.GetSubDatasets() or []
@@ -948,7 +953,7 @@ def create_cutline_from_grid(grid_path: str,
 
         if not candidates:
             _log("error", "No readable subdatasets found in grid.")
-            return None
+            return None, None
 
         grid_wkt = candidates[0][3].GetProjection()
         grid_srs = _srs_from_wkt(grid_wkt) if grid_wkt else None
@@ -1000,7 +1005,7 @@ def create_cutline_from_grid(grid_path: str,
             inter = _bbox_intersection(bbox_grid, grid_ext)
             if inter is None:
                 _log("error", f"Input bbox does not overlap chosen subgrid extent. bbox={bbox_grid} subgrid={grid_ext}")
-                return None
+                return None, None
             target_bbox = inter
         else:
             target_bbox = grid_ext
@@ -1009,7 +1014,7 @@ def create_cutline_from_grid(grid_path: str,
         srcwin = _bbox_to_srcwin(grid_ds, target_bbox, pad_pixels=5)
         if srcwin is None:
             _log("error", f"Crop window collapsed. bbox={target_bbox} -> srcwin=None. grid_ext={grid_ext}")
-            return None
+            return None, None
 
         xoff, yoff, xsize, ysize = srcwin
         _log("info", f"Cropping grid for polygonize: srcWin={srcwin} (bbox={target_bbox})")
@@ -1017,24 +1022,25 @@ def create_cutline_from_grid(grid_path: str,
         cropped = gdal.Translate("", grid_ds, format="MEM", srcWin=[xoff, yoff, xsize, ysize])
         if cropped is None:
             _log("error", "gdal.Translate failed while cropping grid.")
-            return None
+            return None, None
 
         band = cropped.GetRasterBand(1)
         nodata = band.GetNoDataValue()
         arr = band.ReadAsArray()
         if arr is None:
             _log("error", "Failed to read cropped grid band.")
-            return None
+            return None, None
         if nodata is None:
             nodata = -32768.0
 
         valid_mask = (~np.isnan(arr)) & (~np.isclose(arr.astype("float64"), float(nodata)))
         valid_count = int(valid_mask.sum())
         total_count = int(valid_mask.size)
-        _log("info", f"Valid cells (cropped): {valid_count} / {total_count} ({valid_count/total_count*100.0:.2f}%)")
+        overlap_pct = valid_count/total_count*100.0
+        _log("info", f"Valid cells (cropped): {valid_count} / {total_count} ({overlap_pct:.2f}%)")
         if valid_count == 0:
             _log("error", "No valid grid cells under input extent (coverage or axis-order issue).")
-            return None
+            return None, None
 
         # Build a Byte mask dataset for polygonize
         mem = gdal.GetDriverByName("MEM")
@@ -1047,7 +1053,7 @@ def create_cutline_from_grid(grid_path: str,
         mask_band.FlushCache()
 
         # Polygonize into an in-memory vector layer
-        vmem_drv = ogr.GetDriverByName("Memory")
+        vmem_drv = ogr.GetDriverByName("MEM")
         vmem_ds = vmem_drv.CreateDataSource("mem_cutline")
         srs = _srs_from_wkt(grid_wkt) if grid_wkt else None
         vmem_lyr = vmem_ds.CreateLayer("cutline", srs=srs, geom_type=ogr.wkbPolygon)
@@ -1069,7 +1075,7 @@ def create_cutline_from_grid(grid_path: str,
 
         if union_geom is None:
             _log("error", "Failed to build union geometry from polygonized features.")
-            return None
+            return None, None
 
         # Conservative simplify
         if srs and srs.IsGeographic():
@@ -1097,7 +1103,7 @@ def create_cutline_from_grid(grid_path: str,
         out_drv = ogr.GetDriverByName(drv_name)
         if out_drv is None:
             _log("error", f"OGR driver not available: {drv_name}")
-            return None
+            return None, None
         if os.path.exists(output_cutline):
             out_drv.DeleteDataSource(output_cutline)
 
@@ -1117,11 +1123,11 @@ def create_cutline_from_grid(grid_path: str,
         out_ds = None
 
         _log("info", f"Cutline written: {output_cutline}")
-        return output_cutline
+        return output_cutline, overlap_pct
 
     except Exception as e:
         _log("exception", f"Error creating cutline from grid: {e}")
-        return None
+        return None, None
 
 
 def create_cutline_file(v_shift: bool,
@@ -1151,17 +1157,17 @@ def create_cutline_file(v_shift: bool,
                     break
 
         if os.path.exists(grid_file):
-            cutline_path = create_cutline_from_grid(grid_file, cutline_path,
-                                                    input_extent=input_metadata["extent"],
-                                                    input_wkt=input_metadata["wkt"],
-                                                    )
+            cutline_path, overlap_pct = create_cutline_from_grid(grid_file, cutline_path,
+                                                                 input_extent=input_metadata["extent"],
+                                                                 input_wkt=input_metadata["wkt"],
+                                                                 )
             if cutline_path:
                 logger.info(f"Using cutline from grid: {cutline_path} for grid: {grid_file}")
         else:
             logger.warning(f"Grid file not found: {grid_file}")
     else:
         cutline_path = None
-    return cutline_path
+    return cutline_path, overlap_pct
 
 
 def clip_raster_to_cutline(input_path: str, cutline_path: str, output_path: str) -> Optional[str]:
@@ -1188,6 +1194,7 @@ def clip_raster_to_cutline(input_path: str, cutline_path: str, output_path: str)
             format="GTiff",
             cutlineDSName=cutline_path,
             cropToCutline=True,  # Shrink the file extent to the grid overlap
+            srcNodata=nodata,
             dstNodata=nodata,
             xRes=x_res,
             yRes=y_res,
@@ -1210,3 +1217,40 @@ def clip_raster_to_cutline(input_path: str, cutline_path: str, output_path: str)
     except Exception as e:
         logging.error(f"Error in clip_raster_to_cutline: {e}")
         return None
+
+
+def add_vyper_tag(raster_file: str, pipe: str, crs_to: pp.CRS, steps: list) -> None:
+    """
+    Add a Vyperdatum tag to the raster file to indicate it has been processed.
+    """
+    ds = gdal.Open(raster_file, gdal.GA_Update)
+    if ds is None:
+        logger.error(f"Failed to open {raster_file} to add Vyperdatum tag.")
+        return
+
+    # pipe = re.sub(r"\s{2,}", " ", pipe).strip()
+    to_wkt = crs_to.to_wkt()
+    # to_wkt = re.sub(r"\s{2,}", " ", to_wkt).strip()
+    buffer = io.StringIO()
+    sys.stdout = buffer
+    pp.show_versions()
+    sys.stdout = sys.__stdout__
+    pyproj_versions = buffer.getvalue()
+    # pyproj_versions = re.sub(r"\s{2,}", " ", buffer.getvalue()).strip()
+    crs_h, crs_v = crs_utils.crs_components(crs_to, raise_no_auth=False)
+
+    vyper_meta = {"description": ("This file is the output of a transformation pipeline "
+                                  "executed using Vyperdatum software by NOAA's OCS, NBS branch."),
+                  "vyperdatum_version": version("vyperdatum"),
+                  "steps": steps,
+                  "proj_pipeline": pipe,
+                  "wkt": to_wkt,
+                  "crs_horizontal": crs_h if crs_h else "",
+                  "crs_vertical": crs_v if crs_v else "",
+                  "pyproj_versions": pyproj_versions,
+                  }
+    vyper_meta = json.dumps(vyper_meta)
+    ds.SetMetadataItem("Vyperdatum_Metadata", vyper_meta)    
+    ds.FlushCache()
+    ds = None
+    return
