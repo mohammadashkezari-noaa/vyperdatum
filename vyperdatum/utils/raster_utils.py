@@ -1140,13 +1140,15 @@ def create_cutline_file(v_shift: bool,
 
     TODO: what if more than one NWLD grids are involved?
     """
-    if v_shift and grid_files:
+    if v_shift and grid_files:        
+        grid_file = None
         # Use the first nwld grid file (or we could merge multiple grids)
-        grid_file = grid_files[0]
         for gf in grid_files:
             if gf.lower().find("nwld") != -1:
                 grid_file = gf
                 break
+        if grid_file is None:
+            return None, None
         if not os.path.isabs(grid_file):
             vyper_grids = os.environ.get("VYPER_GRIDS", "")
 
