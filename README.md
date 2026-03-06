@@ -29,10 +29,10 @@ Vyperdatum requires `GDAL` which can be installed from the conda's conda-forge c
 ```bash
 conda create -n vd python=3.11
 conda activate vd
-conda install -c conda-forge proj=9.4 gdal=3.8.4 python-pdal
+conda install -c conda-forge proj=9.6 gdal python-pdal
 pip install vyperdatum
 ```
-Before running vyperdatum, you need to download NOAA's datum files and the updated `proj.db` [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15184045.svg)](https://doi.org/10.5281/zenodo.15184045). Once downloaded, create a persistent environment variable `VYPER_GRIDS` to hold the path to directory where the downloaded grids and `proj.db` are located. 
+Before running vyperdatum, you need to download NOAA's datum files and the updated `proj.db` [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18893503.svg)](https://doi.org/10.5281/zenodo.18893503). Once downloaded, create a persistent environment variable `VYPER_GRIDS` to hold the path to directory where the downloaded grids and `proj.db` are located. 
 
 ## Usage
 Vyperdatum offers a `Transformer` class to handle the transformation of point and raster data. The `Transformer` class applies transformation from `crs_from` to `crs_to` coordinate reference system. By default the transformation steps will be determined automatically:
@@ -40,7 +40,7 @@ Vyperdatum offers a `Transformer` class to handle the transformation of point an
 ```python
 from vyperdatum.transformer import Transformer
 
-crs_from = "EPSG:6346"            # NAD83(2011) 17N
+crs_from = "EPSG:6346"            # NAD83(2011) 17N (vertical: Ellipsoid)
 crs_to = "EPSG:6346+NOAA:98"      # NAD83(2011) 17N + MLLW
 tf = Transformer(crs_from=crs_from,
                  crs_to=crs_to,
@@ -80,9 +80,9 @@ You may also, directly call the file-specific transform methods instead of the g
 <summary>Click to see pseudo-code examples</summary>
             
 ```python
-# dircet point transformation. x, y, z can be arrays, too.
-x, y, z = 278881.198, 2719890.433, 0
-xt, yt, zt = tf.transform_points(x, y, z, always_xy=True, allow_ballpark=False)
+# dircet point transformation. The input x, y, z can be list or numpy arrays.
+xi, yi, zi = np.array([278881.198]), np.array([2719890.433]), np.array([0])
+xt, yt, zt, success = tf.transform_points(x=xi, y=yi, z=zi, always_xy=True)
 
 # GDAL-supported raster transform  
 tf.transform_raster(input_file=<PATH_TO_INPUT_RASTER_FILE>,
