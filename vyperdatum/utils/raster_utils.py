@@ -450,7 +450,7 @@ def update_raster_wkt(input_file: str, wkt: str) -> None:
     wkt: str
         New WKT to update the raster file.    
     """
-    if not os.path.exists(input_file):
+    if gdal.VSIStatL(input_file) is None:
         err_msg = f"Trying to update WKT, but the input raster file {input_file} does not exist."
         logger.error(err_msg)
         raise FileNotFoundError(err_msg)
@@ -490,7 +490,7 @@ def update_raster_wkt(input_file: str, wkt: str) -> None:
         out = None
         ds = None
 
-        os.replace(tmp_out, input_file)
+        gdal.Rename(tmp_out, input_file)
         return
 
     # Other drivers: try in-place, else fall back to copy-on-write via Translate
@@ -766,7 +766,7 @@ def apply_nbs_band_standards(input_file: str) -> None:
     Parameters:
         input_file (str): Path to the raster file.
     """
-    if not os.path.exists(input_file):
+    if gdal.VSIStatL(input_file) is None:
         err_msg = f"Raster file {input_file} does not exist."
         logger.error(err_msg)
         raise FileNotFoundError(err_msg)
@@ -787,6 +787,8 @@ def create_cutline_from_grid(grid_path: str,
     """
     Create a cutline polygon from a GTG grid's valid (non-nodata) area,
     restricted to the vicinity of `input_extent` (bbox) when provided.
+    This version supports rasters that span multiple subgrids by unioning 
+    all overlapping valid areas.
     """
     _logger = globals().get("logger", None)
 
@@ -797,25 +799,14 @@ def create_cutline_from_grid(grid_path: str,
             print(f"{level.upper()}: {msg}")
 
     def _inv_geotransform(gt):
-        """
-        GDAL Python bindings differ by version:
-          - Some return (ok, inv_gt)
-          - Some return inv_gt (6-tuple) directly
-        Normalize to inv_gt (6-tuple) and raise on failure.
-        """
         inv = gdal.InvGeoTransform(gt)
-
-        # (ok, inv_gt)
         if isinstance(inv, tuple) and len(inv) == 2 and isinstance(inv[0], (bool, int)):
             ok, inv_gt = inv
             if not ok:
                 raise RuntimeError("gdal.InvGeoTransform failed")
             return tuple(inv_gt)
-
-        # direct 6-tuple
         if isinstance(inv, (tuple, list)) and len(inv) == 6:
             return tuple(inv)
-
         raise RuntimeError(f"Unexpected gdal.InvGeoTransform return: {type(inv)} {inv}")
 
     def _ds_extent(ds):
@@ -852,7 +843,6 @@ def create_cutline_from_grid(grid_path: str,
 
         inv_gt = _inv_geotransform(ds.GetGeoTransform())
 
-        # top-left and bottom-right in map coords
         px0, py0 = gdal.ApplyGeoTransform(inv_gt, xmin, ymax)
         px1, py1 = gdal.ApplyGeoTransform(inv_gt, xmax, ymin)
 
@@ -894,34 +884,6 @@ def create_cutline_from_grid(grid_path: str,
         ys = [p[1] for p in pts]
         return (min(xs), min(ys), max(xs), max(ys))
 
-    def _sample_validity(ds, bbox, nodata):
-        xmin, ymin, xmax, ymax = bbox
-        xs = [xmin, (xmin + xmax) / 2.0, xmax]
-        ys = [ymin, (ymin + ymax) / 2.0, ymax]
-        band = ds.GetRasterBand(1)
-        inv_gt = _inv_geotransform(ds.GetGeoTransform())
-
-        valid = 0
-        total = 0
-        for x in xs:
-            for y in ys:
-                total += 1
-                px, py = gdal.ApplyGeoTransform(inv_gt, x, y)
-                col = int(round(px))
-                row = int(round(py))
-                if col < 0 or row < 0 or col >= ds.RasterXSize or row >= ds.RasterYSize:
-                    continue
-                arr = band.ReadAsArray(col, row, 1, 1)
-                if arr is None:
-                    continue
-                v = float(arr[0, 0])
-                if np.isnan(v):
-                    continue
-                if nodata is not None and np.isclose(v, nodata):
-                    continue
-                valid += 1
-        return valid, total
-
     try:
         gdal.UseExceptions()
         ogr.UseExceptions()
@@ -941,15 +903,11 @@ def create_cutline_from_grid(grid_path: str,
                 if ds is None:
                     continue
                 ext = _ds_extent(ds)
-                gt = ds.GetGeoTransform()
-                px_area = abs(gt[1] * gt[5]) if gt else float("inf")
-                candidates.append((idx, name, desc, ds, ext, px_area))
+                candidates.append((idx, name, desc, ds, ext))
         else:
             ds = container
             ext = _ds_extent(ds)
-            gt = ds.GetGeoTransform()
-            px_area = abs(gt[1] * gt[5]) if gt else float("inf")
-            candidates.append((0, grid_path, "", ds, ext, px_area))
+            candidates.append((0, grid_path, "", ds, ext))
 
         if not candidates:
             _log("error", "No readable subdatasets found in grid.")
@@ -967,117 +925,87 @@ def create_cutline_from_grid(grid_path: str,
             else:
                 bbox_grid = bbox_in
 
-        chosen = candidates[0]
+        # Identify all subgrids that overlap our raster bounding box
+        overlapping_cands = []
         if bbox_grid is not None:
-            scored = []
-            for idx, name, desc, ds, ext, px_area in candidates:
+            for cand in candidates:
+                idx, name, desc, ds, ext = cand
                 inter = _bbox_intersection(bbox_grid, ext)
-                if inter is None:
-                    continue
-                band = ds.GetRasterBand(1)
-                nodata = band.GetNoDataValue()
-                vcount, _ = _sample_validity(ds, inter, nodata)
-                area = abs((ext[2] - ext[0]) * (ext[3] - ext[1]))
-                scored.append((vcount, -area, -1.0 / (px_area + 1e-30), idx))
-            if scored:
-                scored.sort(reverse=True)
-                best_idx = scored[0][3]
-                chosen = next(c for c in candidates if c[0] == best_idx)
-                _log("info", f"Selected subgrid {chosen[0]} using valid-sample scoring. extent={chosen[4]}")
-            else:
-                # fallback: max overlap
-                best = None
-                for cand in candidates:
-                    idx, name, desc, ds, ext, px_area = cand
-                    inter = _bbox_intersection(bbox_grid, ext)
-                    if inter is None:
-                        continue
-                    overlap = (inter[2] - inter[0]) * (inter[3] - inter[1])
-                    if best is None or overlap > best[0]:
-                        best = (overlap, cand)
-                if best:
-                    chosen = best[1]
-                    _log("warning", f"Fell back to max-overlap subgrid {chosen[0]}")
-
-        idx, chosen_name, chosen_desc, grid_ds, grid_ext, _ = chosen
-
-        if bbox_grid is not None:
-            inter = _bbox_intersection(bbox_grid, grid_ext)
-            if inter is None:
-                _log("error", f"Input bbox does not overlap chosen subgrid extent. bbox={bbox_grid} subgrid={grid_ext}")
+                if inter is not None:
+                    overlapping_cands.append((cand, inter))
+            if not overlapping_cands:
+                _log("error", f"Input bbox does not overlap any subgrids. bbox={bbox_grid}")
                 return None, None
-            target_bbox = inter
         else:
-            target_bbox = grid_ext
-            _log("warning", "No input_extent provided; polygonizing the full grid can be slow/huge.")
+            overlapping_cands = [(cand, cand[4]) for cand in candidates]
 
-        srcwin = _bbox_to_srcwin(grid_ds, target_bbox, pad_pixels=5)
-        if srcwin is None:
-            _log("error", f"Crop window collapsed. bbox={target_bbox} -> srcwin=None. grid_ext={grid_ext}")
-            return None, None
+        _log("info", f"Found {len(overlapping_cands)} overlapping subgrid(s). Processing union...")
 
-        xoff, yoff, xsize, ysize = srcwin
-        _log("info", f"Cropping grid for polygonize: srcWin={srcwin} (bbox={target_bbox})")
-
-        cropped = gdal.Translate("", grid_ds, format="MEM", srcWin=[xoff, yoff, xsize, ysize])
-        if cropped is None:
-            _log("error", "gdal.Translate failed while cropping grid.")
-            return None, None
-
-        band = cropped.GetRasterBand(1)
-        nodata = band.GetNoDataValue()
-        arr = band.ReadAsArray()
-        if arr is None:
-            _log("error", "Failed to read cropped grid band.")
-            return None, None
-        if nodata is None:
-            nodata = -32768.0
-
-        valid_mask = (~np.isnan(arr)) & (~np.isclose(arr.astype("float64"), float(nodata)))
-        valid_count = int(valid_mask.sum())
-        total_count = int(valid_mask.size)
-        overlap_pct = valid_count/total_count*100.0
-        _log("info", f"Valid cells (cropped): {valid_count} / {total_count} ({overlap_pct:.2f}%)")
-        if valid_count == 0:
-            _log("error", "No valid grid cells under input extent (coverage or axis-order issue).")
-            return None, None
-
-        # Build a Byte mask dataset for polygonize
-        mem = gdal.GetDriverByName("MEM")
-        mask_ds = mem.Create("", xsize, ysize, 1, gdal.GDT_Byte)
-        mask_ds.SetGeoTransform(cropped.GetGeoTransform())
-        if grid_wkt:
-            mask_ds.SetProjection(grid_wkt)
-        mask_band = mask_ds.GetRasterBand(1)
-        mask_band.WriteArray(valid_mask.astype("uint8"))
-        mask_band.FlushCache()
-
-        # Polygonize into an in-memory vector layer
-        vmem_drv = ogr.GetDriverByName("MEM")
-        vmem_ds = vmem_drv.CreateDataSource("mem_cutline")
-        srs = _srs_from_wkt(grid_wkt) if grid_wkt else None
-        vmem_lyr = vmem_ds.CreateLayer("cutline", srs=srs, geom_type=ogr.wkbPolygon)
-        vmem_lyr.CreateField(ogr.FieldDefn("DN", ogr.OFTInteger))
-
-        _log("info", "Polygonizing mask (in-memory)...")
-        gdal.Polygonize(mask_band, mask_band, vmem_lyr, 0, ["8CONNECTED=8"])
-        feat_count = vmem_lyr.GetFeatureCount()
-        _log("info", f"Polygonize created {feat_count} features")
-
-        vmem_lyr.SetAttributeFilter("DN = 1")
         union_geom = None
-        for f in vmem_lyr:
-            g = f.GetGeometryRef()
-            if g is None:
+        total_valid = 0
+        total_cells = 0
+
+        # Iterate and union every valid overlapping geometry
+        for cand, target_bbox in overlapping_cands:
+            idx, name, desc, grid_ds, grid_ext = cand
+            srcwin = _bbox_to_srcwin(grid_ds, target_bbox, pad_pixels=5)
+            if srcwin is None:
                 continue
-            g2 = g.Clone()
-            union_geom = g2 if union_geom is None else union_geom.Union(g2)
+
+            xoff, yoff, xsize, ysize = srcwin
+            cropped = gdal.Translate("", grid_ds, format="MEM", srcWin=[xoff, yoff, xsize, ysize])
+            if cropped is None:
+                continue
+
+            band = cropped.GetRasterBand(1)
+            nodata = band.GetNoDataValue()
+            arr = band.ReadAsArray()
+            if arr is None:
+                continue
+            if nodata is None:
+                nodata = -32768.0
+
+            valid_mask = (~np.isnan(arr)) & (~np.isclose(arr.astype("float64"), float(nodata)))
+            v_count = int(valid_mask.sum())
+            t_count = int(valid_mask.size)
+            total_valid += v_count
+            total_cells += t_count
+
+            if v_count == 0:
+                continue
+
+            mem = gdal.GetDriverByName("MEM")
+            mask_ds = mem.Create("", xsize, ysize, 1, gdal.GDT_Byte)
+            mask_ds.SetGeoTransform(cropped.GetGeoTransform())
+            if grid_wkt:
+                mask_ds.SetProjection(grid_wkt)
+            mask_band = mask_ds.GetRasterBand(1)
+            mask_band.WriteArray(valid_mask.astype("uint8"))
+            mask_band.FlushCache()
+
+            vmem_drv = ogr.GetDriverByName("MEM")
+            vmem_ds = vmem_drv.CreateDataSource(f"mem_cutline_{idx}")
+            srs = _srs_from_wkt(grid_wkt) if grid_wkt else None
+            vmem_lyr = vmem_ds.CreateLayer("cutline", srs=srs, geom_type=ogr.wkbPolygon)
+            vmem_lyr.CreateField(ogr.FieldDefn("DN", ogr.OFTInteger))
+
+            gdal.Polygonize(mask_band, mask_band, vmem_lyr, 0, ["8CONNECTED=8"])
+            vmem_lyr.SetAttributeFilter("DN = 1")
+
+            # Merge the subgrid geometry into the master union
+            for f in vmem_lyr:
+                g = f.GetGeometryRef()
+                if g is not None:
+                    g2 = g.Clone()
+                    union_geom = g2 if union_geom is None else union_geom.Union(g2)
 
         if union_geom is None:
-            _log("error", "Failed to build union geometry from polygonized features.")
+            _log("error", "Failed to build union geometry from subgrids.")
             return None, None
 
-        # Conservative simplify
+        overlap_pct = (total_valid / total_cells * 100.0) if total_cells > 0 else 0.0
+        _log("info", f"Valid cells (combined): {total_valid} / {total_cells} ({overlap_pct:.2f}%)")
+
         if srs and srs.IsGeographic():
             tol = 0.0005
         else:
@@ -1087,7 +1015,6 @@ def create_cutline_from_grid(grid_path: str,
         except Exception:
             pass
 
-        # Output driver
         ext = os.path.splitext(output_cutline)[1].lower()
         if ext == ".gpkg":
             drv_name = "GPKG"
@@ -1104,10 +1031,9 @@ def create_cutline_from_grid(grid_path: str,
         if out_drv is None:
             _log("error", f"OGR driver not available: {drv_name}")
             return None, None
-        if os.path.exists(output_cutline):
+        if gdal.VSIStatL(output_cutline) is not None:
             out_drv.DeleteDataSource(output_cutline)
 
-        # For GeoJSON: ask GDAL to write CRS to avoid ambiguous interpretation in some pipelines
         if drv_name == "GeoJSON":
             gdal.SetConfigOption("GDAL_GEOJSON_WRITE_CRS", "YES")
 

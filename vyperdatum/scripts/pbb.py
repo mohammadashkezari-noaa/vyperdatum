@@ -107,13 +107,16 @@ if __name__ == "__main__":
     
     files = [
         # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_525000e_2780000n_tpu.tif",
-        r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_525000e_2785000n_tpu.tif",
-        r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_530000e_2785000n_tpu.tif",
+        # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_525000e_2785000n_tpu.tif",
+        # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_525000e_2785000n_tpu.tif",
+        r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_525000e_2780000n_tpu.tif",
+        r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_535000e_2775000n_tpu.tif",
         # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_535000e_2775000n_tpu.tif",
         # r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBB\Original\3_band_dem\2018_550000e_2785000n_tpu.tif",
         ]
     crs_from = "EPSG:6346"
     crs_to = "EPSG:6346+NOAA:98"
+    crs_to = "EPSG:6346+EPSG:5703"
     # crs_to = "EPSG:26917"
 
     # steps = [{'crs_from': 'EPSG:6346', 'crs_to': 'EPSG:6318', 'v_shift': False},

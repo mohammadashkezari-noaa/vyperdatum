@@ -1,4 +1,5 @@
 import os
+from os import path
 import pathlib
 import shutil
 import copy
@@ -783,7 +784,8 @@ class Transformer():
             ds_pass1 = None
             output_ds = None
             temp_vrt_pass1 = None
-            pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
+            if not str(output_file).lower().startswith("/vsimem/"):
+                pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             input_metadata = raster_metadata(input_file)
             pipe, v_shift, grid_files = steps_to_concat_pipe(self.steps, input_metadata)
 
@@ -877,7 +879,7 @@ class Transformer():
                 ds = gdal.Warp(output_vrt, input_file, **warp_kwargs)
 
             # FUSE might have already created a file with the same name, so we need to check
-            if os.path.exists(output_file):
+            if gdal.VSIStatL(output_file) is not None:
                 suffix = "_vyperdatum"
                 op = Path(output_file)
                 new_name = f"{op.stem}{suffix}{op.suffix}"
@@ -899,7 +901,7 @@ class Transformer():
             output_ds = gdal.Translate(output_file, ds, format=input_metadata["driver"],
                                        outputType=gdal.GDT_Float32,
                                        creationOptions=cop)
-            if not os.path.exists(output_file):
+            if gdal.VSIStatL(output_file) is None:
                 logger.error(f"Output raster was not created: {output_file}")
                 logger.error(f"GDAL last error: {gdal.GetLastErrorMsg()}")
                 return False
@@ -954,7 +956,11 @@ class Transformer():
             #     # raster_utils.add_rat(output_file)
 
         except Exception as e:
-            efile = open(Path(output_file).parent.absolute()/Path(f"{os.path.split(input_file)[1]}_error.txt"), "w")
+            out_dir = Path(output_file).parent.absolute()
+            if str(output_file).lower().startswith("/vsimem/"):
+                out_dir = Path(os.getcwd())
+
+            efile = open(out_dir / f"{os.path.split(input_file)[1]}_error.txt", "w")
             efile.write(str(e))
             efile.close()
         finally:
@@ -962,11 +968,12 @@ class Transformer():
             def safe_remove(path):
                 if path is None:
                     return
-                try:
-                    Path(path).unlink(missing_ok=True)
-                except Exception as e:
-                    logger.warning(f"Could not delete temporary file {path}. Exception: {str(e)}")
-            safe_remove(output_vrt)          
+                if gdal.VSIStatL(path) is not None:
+                    try:
+                        gdal.Unlink(path)
+                    except Exception as e:
+                        logger.warning(f"Could not delete temporary file {path}. Exception: {str(e)}")
+            safe_remove(output_vrt)
             safe_remove(temp_vrt_pass1)
             safe_remove(cutline_path)
             safe_remove(input_file_cut)
