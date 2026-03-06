@@ -21,7 +21,6 @@ Typical use cases include:
 Under the hood, Vyperdatum uses a PROJ database augmented with NOAA grids and metadata. Transformation steps can be inferred automatically from `crs_from`/`crs_to`, or prescribed explicitly when you need fine-grained control over the pipeline. NOAA’s grid files and the updated `proj.db` are not bundled with the package; instead, you download them separately and point the `VYPER_GRIDS` environment variable at their location.
 
 
-**Vyperdatum** [definition] 
 
 ## Installation
 Vyperdatum requires `GDAL` which can be installed from the conda's conda-forge channel. Below, we first create a conda environment, install `GDAL` and Vperdatum.
