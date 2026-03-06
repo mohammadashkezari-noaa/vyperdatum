@@ -14,7 +14,6 @@ The goal of Vyperdatum is to make it easy to transform coastal and hydrographic 
 Typical use cases include:
 
 - Normalizing hydrographic surveys to charting datums for ENC/RNC and bathymetric products  
-- Building seamless coastal DEMs and bathymetric mosaics from surveys referenced to different vertical frames  
 - Preparing inputs for coastal flood, storm surge, and inundation models that require a specific vertical datum  
 - Converting between ellipsoidal, orthometric, and tidal datums for coastal GNSS/GNSS-tide workflows  
 
