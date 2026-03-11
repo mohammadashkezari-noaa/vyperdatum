@@ -770,10 +770,7 @@ class Transformer():
                 concat_pipe = f"{concat_pipe} {pipe.split('+proj=pipeline')[1]}"
                 if step["v_shift"]:
                     v_shift = True
-                    # Extract grid file from pipeline string
-                    match = re.search(r'\+grids=([^\s]+)', pipe)
-                    if match:
-                        grid_files.append(match.group(1))
+            grid_files = re.findall(r'\+grids=([^\s]+)', concat_pipe)
             return concat_pipe, v_shift, grid_files
 
         self._validate_input_file(input_file)
@@ -813,6 +810,7 @@ class Transformer():
 
             # if cutline_path and overlap_pct < 50:
             if cutline_path:
+                print(">>>>>>>>>>>>>>>>>>> CUTLINE PATH <<<<<<<<<<<<<<<<<<<<<<<")
                 # gdal warp may fail if overlap between the input raster and the underlying grid
                 # is too small, in which case we will use cutline to clip the input raster to the
                 # area of overlap. I realized if we combine the coordinate transformation and
@@ -864,6 +862,7 @@ class Transformer():
                 ds = gdal.Warp(output_vrt, ds_pass1, **warp_kwargs_pass2)
 
             else:
+                print(">>>>>>>>>>>>>>>>>>> NO CUTLINE PATH <<<<<<<<<<<<<<<<<<<<<<<")
                 warp_kwargs = {
                     "format": "vrt",
                     "outputType": gdal.gdalconst.GDT_Float32,
