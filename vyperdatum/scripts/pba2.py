@@ -10,6 +10,9 @@ import pyproj as pp
 if __name__ == "__main__":
 
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBA\PBA_WestCoast_UTM10N_NCD\Original\or2014_usace_ncmp_or_dem_J1328127\*.tif"
+    
+    or2014_usace_ncmp_or_dem_J1328127tR00_C01.tif
+
     files = glob.glob(parent_dir, recursive=True)[:1]
     crs_from = "EPSG:26910+EPSG:5703"
     crs_to = "EPSG:26910+NOAA:101"
