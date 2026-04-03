@@ -244,12 +244,12 @@ def validate_transform_steps(steps: Optional[list[str]]) -> bool:
                     logger.error(err_msg)
                     print(Style.RESET_ALL)
                     raise NotImplementedError(err_msg)
-                ps = t1.to_proj4()
+                ps = t1.to_proj4() or str(t1)
                 error_hint = ""
                 if not ps:
                     error_hint = "Null Proj string"
-                elif "+proj=noop" in ps:
-                    error_hint = "+proj=noop"
+                elif "proj=noop" in ps:
+                    error_hint = "proj=noop"
                 elif "Error" in ps:
                     error_hint = "Error in Proj string"
                 if error_hint:
@@ -342,12 +342,12 @@ def validate_transform_steps_dict(steps: Optional[list[dict]]) -> bool:
                     logger.error(err_msg)
                     print(Style.RESET_ALL)
                     raise NotImplementedError(err_msg)
-                ps = t1.to_proj4()
+                ps = t1.to_proj4() or str(t1)
                 error_hint = ""
                 if not ps:
                     error_hint = "Null Proj string"
-                elif "+proj=noop" in ps:
-                    error_hint = "+proj=noop"
+                elif "proj=noop" in ps:
+                    error_hint = "proj=noop"
                 elif "Error" in ps:
                     error_hint = "Error in Proj string"
                 if error_hint:

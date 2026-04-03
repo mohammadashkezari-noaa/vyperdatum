@@ -1,3 +1,8 @@
+
+import os
+os.environ["VYPER_GRIDS"] = r"C:\Users\Mohammad.Ashkezari\Documents\projects\vyperdatum\untrack\vyper_grids"
+
+
 import glob
 from datetime import datetime
 import pyproj as pp
@@ -13,8 +18,8 @@ from raster_arrays import RasterArrays
 if __name__ == "__main__":
 
     parent_dir = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\raster\PBC\Original\2023_ngs_topobathy_DEM_longIslandSound\*.tif"
-    files = glob.glob(parent_dir, recursive=True)[:]
-    crs_from = "EPSG:6347"
+    files = glob.glob(parent_dir, recursive=True)[:1]
+    crs_from = "EPSG:6347+EPSG:5703"
     crs_to = "EPSG:6348+NOAA:101"
 
     for i, input_file in enumerate(files):

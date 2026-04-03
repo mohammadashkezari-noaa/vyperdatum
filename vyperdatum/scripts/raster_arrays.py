@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import json
 import gc
 from pathlib import Path
 from typing import List, Optional
@@ -310,6 +311,86 @@ class RasterArrays:
             f"valid_pixels={self.n_valid}, \nbackend={self.backend!r})"
         )
 
+    def _compute_output_bbox(
+        self,
+        transformer_instance,
+        chunk_size: int,
+        ignore_non_finite: bool,
+        include_all_bands: bool,
+    ) -> list[float] | None:
+        """
+        Compute output XY extent of the points that will actually be written.
+        Returns [xmin, ymin, xmax, ymax] or None if no valid points exist.
+        """
+        xmin = np.inf
+        ymin = np.inf
+        xmax = -np.inf
+        ymax = -np.inf
+        found = False
+
+        n = self.n_valid
+
+        for start in range(0, n, chunk_size):
+            stop = min(start + chunk_size, n)
+
+            x = np.asarray(self.x[start:stop])
+            y = np.asarray(self.y[start:stop])
+            z = np.asarray(self.bands[0][start:stop])
+
+            success, xt, yt, zt = transformer_instance.transform_points(
+                x, y, z, vdatum_check=False
+            )
+
+            xt = np.asarray(xt)
+            yt = np.asarray(yt)
+            zt = np.asarray(zt)
+
+            valid = np.isfinite(xt) & np.isfinite(yt)
+
+            if ignore_non_finite:
+                valid &= np.isfinite(zt)
+                for arr in self.bands:
+                    valid &= np.isfinite(np.asarray(arr[start:stop]))
+
+            if not np.any(valid):
+                continue
+
+            xv = xt[valid]
+            yv = yt[valid]
+
+            xmin = min(xmin, float(np.min(xv)))
+            ymin = min(ymin, float(np.min(yv)))
+            xmax = max(xmax, float(np.max(xv)))
+            ymax = max(ymax, float(np.max(yv)))
+            found = True
+
+        if not found:
+            return None
+
+        return [xmin, ymin, xmax, ymax]
+
+
+    @staticmethod
+    def _set_geo_metadata_bbox(schema, geometry_column: str, bbox: list[float] | None):
+        """
+        Patch GeoParquet 'geo' metadata with bbox for the active geometry column.
+        """
+        if bbox is None:
+            return schema
+
+        md = dict(schema.metadata or {})
+        geo_raw = md.get(b"geo")
+        if geo_raw is None:
+            return schema
+
+        geo = json.loads(geo_raw.decode("utf-8"))
+        geo.setdefault("columns", {})
+        geo["columns"].setdefault(geometry_column, {})
+        geo["columns"][geometry_column]["bbox"] = [float(v) for v in bbox]
+
+        md[b"geo"] = json.dumps(geo).encode("utf-8")
+        return schema.with_metadata(md)
+
     def transform(
         self,
         transformer_instance,
@@ -319,10 +400,17 @@ class RasterArrays:
         keep_xyz: bool = False,
         include_all_bands: bool = False,
         ignore_non_finite: bool = True,
+        include_NBS_additional: bool = True,
+        classification: int = 1,
+        set_extent_metadata: bool = True,
     ) -> bool:
         """
         Transform valid points in chunks and write a single GeoParquet file
         with geometry and optional attributes.
+
+        Column order
+        ------------
+        geometry, uncertainty, classification, [optional others...]
 
         Parameters
         ----------
@@ -333,16 +421,21 @@ class RasterArrays:
         chunk_size : int
             Number of points per chunk.
         compression : str
-            Parquet compression codec. "gzip" usually gives smaller files;
-            "zstd" is often faster.
+            Parquet compression codec.
         keep_xyz : bool
             If True, also write transformed x/y/z columns.
-            If False, write geometry only (smaller output).
         include_all_bands : bool
             If True, include source band values as extra attributes.
         ignore_non_finite : bool
-            If True, drop rows where any transformed x/y/z or any source band
-            value is NaN, +inf, or -inf.
+            If True, drop rows where any transformed x/y/z, any source band,
+            or any optional derived output value is NaN, +inf, or -inf.
+        include_NBS_additional : bool
+            If True, add:
+            - uncertainty = 1 + 0.02 * transformed_z
+            - classification = constant integer value
+        classification : int
+            Constant integer value written to the "classification" column when
+            include_NBS_additional=True.
 
         Returns
         -------
@@ -358,9 +451,18 @@ class RasterArrays:
         all_success = True
         wrote_any_rows = False
 
+        overall_bbox = None
+        if set_extent_metadata:
+            overall_bbox = self._compute_output_bbox(
+                transformer_instance=transformer_instance,
+                chunk_size=chunk_size,
+                ignore_non_finite=ignore_non_finite,
+                include_all_bands=include_all_bands,
+            )
+
         band_cols = []
         if include_all_bands:
-            used = {"geometry", "x", "y", "z"}
+            used = {"geometry", "x", "y", "z", "uncertainty", "classification"}
             for i, name in enumerate(self.band_names):
                 col = str(name).strip() or f"band_{i+1}"
                 if i == 0:
@@ -384,7 +486,7 @@ class RasterArrays:
                 z = np.asarray(self.bands[0][start:stop])
 
                 success, xt, yt, zt = transformer_instance.transform_points(
-                    x, y, z, vdatum_check=False
+                    x, y, z, vdatum_check=False, allow_ballpark=False
                 )
                 all_success = all_success and bool(success)
 
@@ -392,13 +494,29 @@ class RasterArrays:
                 yt = np.asarray(yt)
                 zt = np.asarray(zt)
 
-                # Read source band slices once for this chunk
                 band_slices = [np.asarray(b[start:stop]) for b in self.bands]
+
+                if include_NBS_additional:
+                    uncertainty = np.where(
+                        zt < 0,
+                        1.0 + 0.02 * np.abs(zt),
+                        1.0,
+                    )
+                    uncertainty = np.round(uncertainty, 2).astype(np.float32)
+                    classification_arr = np.full(zt.shape, classification, dtype=np.int32)
 
                 if ignore_non_finite:
                     valid = np.isfinite(xt) & np.isfinite(yt) & np.isfinite(zt)
+
+                    # Drop points where PROJ failed the gridshift and passed Z through unchanged
+                    # (Using a small tolerance of 0.001 to account for float precision)
+                    # valid &= (np.abs(zt - z) > 0.001)
+
                     for arr in band_slices:
                         valid &= np.isfinite(arr)
+
+                    if include_NBS_additional:
+                        valid &= np.isfinite(uncertainty)
 
                     if not np.any(valid):
                         continue
@@ -408,10 +526,19 @@ class RasterArrays:
                     zt = zt[valid]
                     band_slices = [arr[valid] for arr in band_slices]
 
+                    if include_NBS_additional:
+                        uncertainty = uncertainty[valid]
+                        classification_arr = classification_arr[valid]
+
                 if xt.size == 0:
                     continue
 
                 data = {}
+
+                if include_NBS_additional:
+                    data["uncertainty"] = uncertainty
+                    data["classification"] = classification_arr
+
                 if keep_xyz:
                     data["x"] = xt
                     data["y"] = yt
@@ -423,11 +550,24 @@ class RasterArrays:
 
                 geometry = gpd.points_from_xy(xt, yt, z=zt)
 
+                
+
                 gdf = gpd.GeoDataFrame(
                     data,
                     geometry=geometry,
                     crs=target_crs,
                 )
+
+
+                ordered_cols = ["geometry"]
+                if include_NBS_additional:
+                    ordered_cols.extend(["uncertainty", "classification"])
+                if keep_xyz:
+                    ordered_cols.extend(["x", "y", "z"])
+                if include_all_bands:
+                    ordered_cols.extend(band_cols)
+
+                gdf = gdf[ordered_cols]
 
                 chunk_table = pa.table(
                     gdf.to_arrow(index=False, geometry_encoding="WKB")
@@ -446,6 +586,11 @@ class RasterArrays:
                         )
                         bootstrap_table = pq.read_table(tmp_name)
                         schema = bootstrap_table.schema
+                        schema = self._set_geo_metadata_bbox(
+                            schema=schema,
+                            geometry_column="geometry",
+                            bbox=overall_bbox,
+                        )
                     finally:
                         if os.path.exists(tmp_name):
                             os.remove(tmp_name)
@@ -477,4 +622,3 @@ class RasterArrays:
         finally:
             if writer is not None:
                 writer.close()
-
