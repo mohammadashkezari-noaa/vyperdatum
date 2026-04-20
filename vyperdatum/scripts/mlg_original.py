@@ -87,7 +87,7 @@ class XYZ:
         if self.negate_z:
             self.df["z"] = -self.df["z"]
             self.df["z_t"] = -self.df["z_t"]
-        self.df["uncertainty"] = 1 + 0.02 * self.df["z_t"].abs()
+        self.df["Uncertainty"] = 1 + 0.02 * self.df["z_t"].abs()
         return self.df
 
     def to_gpkg(self,
@@ -95,29 +95,42 @@ class XYZ:
                 output_file: str) -> None:
         tdf = pd.DataFrame({"x": self.df["x_t"].values,
                             "y": self.df["y_t"].values,
-                            "elevation": self.df["z_t"].values,
+                            "Elevation": self.df["z_t"].values,
                             })
-        tdf["geometry"] = tdf.apply(lambda row: Point(row["x"], row["y"], row["elevation"]), axis=1)
-        tdf["uncertainty"] = self.df["uncertainty"].values
+        tdf["geometry"] = tdf.apply(lambda row: Point(row["x"], row["y"], row["Elevation"]), axis=1)
+        tdf["Uncertainty"] = self.df["Uncertainty"].values
         gdf = gpd.GeoDataFrame(tdf, geometry="geometry", crs=crs)
         gdf.to_file(output_file, driver="GPKG")
         return
 
 
-
+# from vyperdatum.pipeline import Pipeline
+# import sys
+# # print(Pipeline(crs_from="ESRI:103060", crs_to="EPSG:6318").graph_steps())
+# print(Pipeline(crs_from="EPSG:6783", crs_to="EPSG:6344").graph_steps())
+# sys.exit()
 
 
 
 input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\point\MLG\Original\AR_01_BAR_20240117_PR\AR_01_BAR_20240117_PR.XYZ"
-crs_from = "EPSG:3452+NOAA:86"  # must be NOAA:66, just testing since depth datum fails currently
-crs_to = "EPSG:6344+NOAA:101"  
+crs_from = "EPSG:3452+NOAA:1502" # MLG depth not usable for now, use NOAA:1502 USACE height
+crs_to = "EPSG:6344+NOAA:100"  # MLLW depth (due to current db issues, I use NOAA:101 and negate to get depth)
+negate_z = True  # MLG depth is negative, NOAA:98 is positive
 
+
+steps = [{"crs_from": "EPSG:3452", "crs_to": "EPSG:6318", "v_shift": False},
+         {"crs_from": "EPSG:6318+NOAA:1502", "crs_to": "EPSG:6318+NOAA:101", "v_shift": True},
+         {"crs_from": "EPSG:6318", "crs_to": "EPSG:6344", "v_shift": False}
+         ]
 
 xyz = XYZ(input_file=input_file,
+          negate_z=negate_z,
+          unit_conversion=0.3048006096
         #   skiprows=15,
         #   col_names=["xi", "yi", "zi"]
           )
 df = xyz.transform(crs_from=crs_from, crs_to=crs_to,
+                   steps=steps
                    )
 output_file = input_file.replace("Original", "Manual").replace(".XYZ", ".gpkg")
 os.makedirs(os.path.dirname(output_file), exist_ok=True)
