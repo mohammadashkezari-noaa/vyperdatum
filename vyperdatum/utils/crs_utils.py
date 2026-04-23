@@ -521,3 +521,64 @@ def flip_vertical_vaxis(auth_code) -> str:
         if cand_name == target_name:
             return full_code
     raise ValueError(f"Could not find a CRS named '{target_name}' in authority {auth_name}.")
+
+
+def get_meter_vcrs(auth_code):
+    if auth_code is None:
+        return None
+        
+    crs = pp.CRS.from_user_input(auth_code)
+    auth_name = auth_code.split(':')[0].upper()
+    
+    crs_dict = crs.to_json_dict()
+    axis_info = crs_dict['coordinate_system']['axis'][0]
+    
+    if axis_info.get('unit') == "metre":
+        return auth_code
+
+    target_datum = crs_dict.get('datum', {}).get('name')
+    target_dir = axis_info.get('direction').lower()
+    target_bbox = crs_dict.get('bbox')
+    orig_name = crs_dict.get('name', '')
+
+    # Handle NOAA-specific versioning (e.g., "nwldatum_4.7.0")
+    version_clue = None
+    nwld_clue = "National_Water_Level_Datum/nwldatum_"
+    if auth_name == "NOAA" and nwld_clue in orig_name:
+        try:
+            version_clue = orig_name.split(nwld_clue)[1].split("_")[0]
+        except IndexError:
+            pass
+
+    codes = pp.get_codes(auth_name, "VERTICAL_CRS", allow_deprecated=True)
+    best_match = None
+    
+    for code in codes:
+        full_code = f"{auth_name}:{code}"
+        if full_code == auth_code:
+            continue
+            
+        candidate_crs = pp.CRS.from_user_input(full_code)
+        cand_dict = candidate_crs.to_json_dict()
+        cand_axis = cand_dict['coordinate_system']['axis'][0]
+        
+        if cand_axis.get('unit') != "metre":
+            continue
+        if cand_axis.get('direction').lower() != target_dir:
+            continue
+        if cand_dict.get('datum', {}).get('name') != target_datum:
+            continue
+
+        cand_name = cand_dict.get('name', '')        
+        if version_clue and version_clue not in cand_name:
+            continue
+
+        if cand_dict.get('bbox') == target_bbox:
+            return full_code
+            
+        best_match = full_code
+
+    if best_match:
+        return best_match
+        
+    raise ValueError(f"No meter-based VCRS found for {auth_code} in {auth_name}.")
