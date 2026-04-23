@@ -109,15 +109,21 @@ class XYZ:
 
 
 input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack\data\point\MLG\Original\AR_01_BAR_20240117_PR\AR_01_BAR_20240117_PR.XYZ"
-crs_from = "EPSG:3452+NOAA:86"  # must be NOAA:66, just testing since depth datum fails currently
+crs_from = "EPSG:3452+NOAA:66"
 crs_to = "EPSG:6344+NOAA:101"  
 
+# steps = [{'crs_from': 'EPSG:3452', 'crs_to': 'EPSG:4269', 'v_shift': False},
+#          {'crs_from': 'EPSG:6318+NOAA:66', 'crs_to': 'EPSG:6318+NOAA:86', 'v_shift': True},
+#          {'crs_from': 'EPSG:6318+NOAA:86', 'crs_to': 'EPSG:6318+NOAA:101', 'v_shift': True},
+#          {'crs_from': 'EPSG:6318', 'crs_to': 'EPSG:6344', 'v_shift': False}
+#          ]
 
 xyz = XYZ(input_file=input_file,
         #   skiprows=15,
         #   col_names=["xi", "yi", "zi"]
           )
 df = xyz.transform(crs_from=crs_from, crs_to=crs_to,
+                #    steps=steps
                    )
 output_file = input_file.replace("Original", "Manual").replace(".XYZ", ".gpkg")
 os.makedirs(os.path.dirname(output_file), exist_ok=True)

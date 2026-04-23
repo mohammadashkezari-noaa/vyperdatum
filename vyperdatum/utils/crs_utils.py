@@ -463,3 +463,61 @@ def pipeline_string(crs_from: str, crs_to, input_metadata=None) -> Optional[str]
             break
         pipe += split
     return pipe
+
+
+def vertical_axis_direction(crs_auth_code) -> str:
+    crs = pp.CRS(crs_auth_code)    
+    if not crs.is_vertical and not crs.is_compound:
+        return "Not a vertical or compound CRS."    
+    crs_dict = crs.to_json_dict()    
+    if crs.is_compound:
+        v_crs_dict = crs_dict['components'][1]
+    else:
+        v_crs_dict = crs_dict
+
+    try:
+        axis = v_crs_dict['coordinate_system']['axis'][0]
+        direction = axis['direction'].lower()
+        
+        if direction in ["up", "down"]:
+            return direction
+        else:
+            axis_name = axis.get('name', 'unknown')
+            return f"Unknown direction: {direction} for {axis_name} axis in {crs_auth_code}"
+            
+    except (KeyError, IndexError):
+        return f"Could not parse axis information for {crs_auth_code}"
+
+
+
+def flip_vertical_vaxis(auth_code) -> str:
+    """
+    Finds the flipped VCRS by explicitly swapping 'height' and 'depth' 
+    in the CRS name and searching the database for that exact name.
+    """
+    original_crs = pp.CRS.from_user_input(auth_code)
+    auth_name = auth_code.split(':')[0]
+    try:
+        orig_name = original_crs.name
+    except AttributeError:
+        orig_name = original_crs.to_json_dict().get('name', '')
+    lower_name = orig_name.lower()
+    if "height" in lower_name:
+        target_name = orig_name.replace("height", "depth").replace("Height", "Depth")
+    elif "depth" in lower_name:
+        target_name = orig_name.replace("depth", "height").replace("Depth", "Height")
+    else:
+        raise ValueError(f"CRS name '{orig_name}' does not contain 'height' or 'depth'.")
+    codes = pp.get_codes(auth_name, "VERTICAL_CRS", allow_deprecated=True)
+    for code in codes:
+        full_code = f"{auth_name}:{code}"
+        if full_code == auth_code:
+            continue
+        candidate_crs = pp.CRS.from_user_input(full_code)
+        try:
+            cand_name = candidate_crs.name
+        except AttributeError:
+            cand_name = candidate_crs.to_json_dict().get('name', '')
+        if cand_name == target_name:
+            return full_code
+    raise ValueError(f"Could not find a CRS named '{target_name}' in authority {auth_name}.")
