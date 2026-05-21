@@ -549,24 +549,25 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
     input_metadata = raster_metadata(input_file)
     driver = gdal.GetDriverByName(input_metadata["driver"])
 
+    # --- FIX 1: Match dimensions to ds_out instead of ds_in ---
+    w_out, h_out = ds_out.RasterXSize, ds_out.RasterYSize
     mem_path = f"/vsimem/{os.path.splitext(os.path.basename(output_file))[0]}.tiff"
     ds_temp = driver.Create(
         mem_path,
-        ds_in.RasterXSize,
-        ds_in.RasterYSize,
+        w_out,
+        h_out,
         ds_in.RasterCount,
         gdal.GDT_Float32
     )
     ds_temp.SetGeoTransform(ds_out.GetGeoTransform())
     ds_temp.SetProjection(ds_out.GetProjection())
 
-    # --- Read elevation (from ds_out) once and build a validity mask ---
+    # Read transformed elevation from ds_out
     elev_out_band = ds_out.GetRasterBand(elevation_band)
     elev_arr = elev_out_band.ReadAsArray()
     elev_nodata = elev_out_band.GetNoDataValue()
 
     if elev_nodata is None:
-        # Fall back: treat non-finite as invalid
         valid_elev = np.isfinite(elev_arr)
     else:
         if np.isnan(elev_nodata):
@@ -574,52 +575,42 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
         else:
             valid_elev = (elev_arr != elev_nodata) & np.isfinite(elev_arr)
 
-    # --- Write all bands; mask uncertainty where elevation is invalid ---
+    # --- FIX 2: Safely extract source bands accounting for grid shifts ---
     for b in range(1, ds_in.RasterCount + 1):
         out_band = ds_temp.GetRasterBand(b)
 
         if b == elevation_band:
-            # Write transformed elevation from ds_out
             out_band.SetDescription("Elevation")
             if elev_nodata is not None:
                 out_band.SetNoDataValue(float(elev_nodata))
             out_band.WriteArray(elev_arr.astype(np.float32, copy=False))
 
-        elif uncertainty_band is not None and b == uncertainty_band:
-            in_unc_band = ds_in.GetRasterBand(b)
-            unc_arr = in_unc_band.ReadAsArray().astype(np.float32, copy=False)
-
-            # Choose an output NoData for uncertainty
-            unc_nodata_in = in_unc_band.GetNoDataValue()
-            if unc_nodata_in is not None:
-                unc_nodata_out = float(unc_nodata_in)
-            elif elev_nodata is not None and np.isfinite(elev_nodata):
-                unc_nodata_out = float(elev_nodata)
-            else:
-                unc_nodata_out = input_metadata["band_no_data"][0]
-
-            # Mask uncertainty wherever elevation is NoData
-            unc_masked = np.array(unc_arr, copy=True)
-            unc_masked[~valid_elev] = unc_nodata_out
-
-            out_band.SetDescription("Uncertainty")
-            out_band.SetNoDataValue(unc_nodata_out)
-            out_band.WriteArray(unc_masked)
-
         else:
-            # Copy any other non-elevation bands from the input (mask at no elevation points)
             in_band = ds_in.GetRasterBand(b)
-            arr = in_band.ReadAsArray()
+            
+            # Use GDAL's internal raster IO engine to dynamically match dimensions
+            # instead of matching raw NumPy shapes. This cleanly scales over the 1-pixel shift.
+            arr = in_band.ReadAsArray(buf_xsize=w_out, buf_ysize=h_out)
+            
             if elev_nodata is not None and np.isfinite(elev_nodata):
                 unc_nodata_out = float(elev_nodata)
             else:
                 unc_nodata_out = input_metadata["band_no_data"][0]
+                
             arr_masked = np.array(arr, copy=True)
             arr_masked[~valid_elev] = unc_nodata_out
-            out_band.SetDescription(in_band.GetDescription())
+            
+            if b == uncertainty_band:
+                out_band.SetDescription("Uncertainty")
+            else:
+                out_band.SetDescription(in_band.GetDescription())
+                
             nd = in_band.GetNoDataValue()
             if nd is not None:
                 out_band.SetNoDataValue(float(nd))
+            else:
+                out_band.SetNoDataValue(unc_nodata_out)
+                
             out_band.WriteArray(arr_masked.astype(np.float32, copy=False))
 
     ds_in, ds_out = None, None
@@ -639,7 +630,6 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
 
     ds_temp = None
     gdal.Unlink(mem_path)
-
 
 def update_stats(input_file):
     """
@@ -1126,6 +1116,7 @@ def clip_raster_to_cutline(input_path: str, cutline_path: str, output_path: str)
             dstNodata=nodata,
             xRes=x_res,
             yRes=y_res,
+            targetAlignedPixels=True,
             resampleAlg="near",
             creationOptions=["COMPRESS=DEFLATE", "TILED=YES"]
         )

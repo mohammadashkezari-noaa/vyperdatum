@@ -849,7 +849,7 @@ class Transformer():
                     "xRes": abs(xres),
                     "yRes": abs(yres),
                     "cutlineDSName": cutline_path,
-                    "cropToCutline": False,
+                    "cropToCutline": True,
                     "dstNodata": original_metadata["band_no_data"][0],
                 }
 
@@ -907,7 +907,12 @@ class Transformer():
             output_ds = None
             ds = None
 
-            overwrite_with_original(original_input_file, output_file)
+            # Choose the correct reference file matching the current layout dimensions ---
+            if input_file_cut and os.path.exists(input_file_cut):
+                overwrite_with_original(input_file_cut, output_file)
+            else:
+                overwrite_with_original(original_input_file, output_file)
+
             update_raster_wkt(output_file, self.crs_to.to_wkt())
             apply_nbs_band_standards(output_file)
             add_vyper_tag(output_file, pipe, self.crs_to, self.steps)
