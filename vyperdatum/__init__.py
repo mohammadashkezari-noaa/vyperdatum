@@ -7,6 +7,7 @@ import time
 import logging.config
 from osgeo import gdal
 import pyproj as pp
+pp.network.set_network_enabled(True)
 from vyperdatum.db import DB
 from vyperdatum.enums import PROJDB, DATUM_DOI
 from vyperdatum.utils import assets_util
