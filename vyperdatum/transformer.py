@@ -727,18 +727,35 @@ class Transformer():
                          output_file: str,
                          overview: bool = False,
                          pre_post_checks: bool = True,
-                         vdatum_check: bool = True
+                         vdatum_check: bool = True,
+                         _allow_different_horizontal_crs: bool = False,
                          ) -> bool:
         """
         Transform the gdal-supported input rater file (`input_file`) and store the
         transformed file on the local disk (`output_file`).
+
+        Horizontal CRS limitation
+        -------------------------
+        As of this release, raster transformation requires the input and
+        output horizontal CRSs to match. The current pipeline anchors the
+        output to the input's pixel grid (origin, resolution, dimensions)
+        which is well-defined only when both ends share a horizontal CRS;
+        across different horizontal CRSs the existing code path produces
+        non-elevation bands that are silently misregistered. Attempting to
+        run such a transformation raises ``NotImplementedError`` by
+        default. The bypass parameter ``_allow_different_horizontal_crs``
+        is intended for development testing only and should not be used
+        in production until the different-horizontal-CRS path has been
+        properly implemented.
 
         Raises
         -------
         FileNotFoundError:
             If the input raster file is not found.
         NotImplementedError:
-            If the input file is not supported by gdal.
+            If the input file is not supported by gdal, or if the input
+            and output horizontal CRSs differ and the bypass flag is not
+            set.
 
         Parameters
         -----------
@@ -754,6 +771,11 @@ class Transformer():
         vdatum_check: bool, default=True
             If True, a random sample of the transformed data are compared with transformation
             outcomes produced by Vdatum REST API.
+        _allow_different_horizontal_crs: bool, default=False
+            Development bypass for the horizontal-CRS-equality safety
+            check. Leave at its default in production. Setting True
+            permits transformations across different horizontal CRSs but
+            does not guarantee correct results.
 
 
         Returns
@@ -773,6 +795,40 @@ class Transformer():
             grid_files = re.findall(r'\+grids=([^\s]+)', concat_pipe)
             return concat_pipe, v_shift, grid_files
 
+        # Horizontal-CRS equality check. Same-horizontal-CRS is the only
+        # path that is fully validated. Different-horizontal-CRS produces
+        # a result whose output pixel grid is undefined relative to the
+        # input and whose non-elevation bands are silently misregistered
+        # by overwrite_with_original. The check is performed before any
+        # other work and before the ``try`` block, so a misconfigured
+        # call fails loudly rather than being caught and written to a
+        # ``*_error.txt`` file alongside other transformation errors.
+        try:
+            h_from, _ = crs_utils.crs_components(self.crs_from, raise_no_auth=False)
+            h_to, _ = crs_utils.crs_components(self.crs_to, raise_no_auth=False)
+        except Exception:
+            h_from, h_to = None, None
+        if (
+            not _allow_different_horizontal_crs
+            and h_from is not None
+            and h_to is not None
+            and h_from != h_to
+        ):
+            raise NotImplementedError(
+                "transform_raster currently requires the input and output "
+                "horizontal CRSs to match. "
+                f"Input horizontal CRS:  {h_from}. "
+                f"Output horizontal CRS: {h_to}. "
+                "The existing pipeline anchors the output to the input's "
+                "pixel grid, which is well-defined only when both ends "
+                "share a horizontal CRS. Cross-CRS raster transformation "
+                "(for example UTM to Geographic, or UTM to State Plane) "
+                "is on the roadmap but not yet implemented. For now, "
+                "convert to point-cloud format (e.g. GeoParquet, LAZ) "
+                "and use the corresponding driver, which handles "
+                "different horizontal CRSs correctly."
+            )
+
         self._validate_input_file(input_file)
         try:
             success = False
@@ -780,7 +836,7 @@ class Transformer():
             ds = None
             ds_pass1 = None
             output_ds = None
-            temp_vrt_pass1 = None
+            temp_pass1 = None
             if not str(output_file).lower().startswith("/vsimem/"):
                 pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             input_metadata = raster_metadata(input_file)
@@ -810,23 +866,44 @@ class Transformer():
 
             # if cutline_path and overlap_pct < 50:
             if cutline_path:
-                print(">>>>>>>>>>>>>>>>>>> CUTLINE PATH <<<<<<<<<<<<<<<<<<<<<<<")
-                # gdal warp may fail if overlap between the input raster and the underlying grid
-                # is too small, in which case we will use cutline to clip the input raster to the
-                # area of overlap. I realized if we combine the coordinate transformation and
-                # cutline masking in one gdal.Warp operation, the output can be wrong/fail.
-                # So I separated the cutting and warping into two passes:
-                # the first pass only does coordinate transformation without cutline masking,
-                # and the second pass applies cutline masking without coordinate transformation.
+                # When the overlap between the input raster and the underlying
+                # NWLD/underkeel grid is small, a single gdal.Warp combining
+                # coordinate transformation and cutline masking can fail or
+                # produce incorrect output. The work is therefore split into
+                # two passes: Pass 1 applies the coordinate transformation
+                # against the cutline-clipped input, and Pass 2 expands the
+                # transformed result back to the original extent while masking
+                # pixels outside the cutline polygon to NoData. The clip,
+                # Pass 1, and Pass 2 are all anchored to the input raster's
+                # pixel grid so the output is pixel-for-pixel registered with
+                # the input (same-CRS case).
                 input_file = raster_utils.clip_raster_to_cutline(input_file, cutline_path,
                                                                  output_path=str(Path(output_file).parent / f"{Path(output_file).stem}_cut_to_grid{Path(output_file).suffix}"))
                 input_file_cut = input_file
                 cut_metadata = raster_metadata(input_file_cut)
 
-                # PASS 1: Transform mathematically
-                temp_vrt_pass1 = str(output_vrt).replace('.vrt', '_pass1.vrt')
+                # PASS 1: Transform mathematically.
+                #
+                # Pass 1's output is materialized as a real GeoTIFF rather
+                # than a VRT. Writing format='vrt' produces a lazy dataset
+                # that stores the coordinate operation pipeline and
+                # evaluates pixel values on demand against the underlying
+                # cut file. When Pass 2 later reads from such a VRT and
+                # asks for output pixels outside Pass 1's safe-evaluation
+                # region (because Pass 2 expands the extent back to the
+                # full original input), GDAL re-runs the embedded pipeline
+                # against the NWLD or underkeel grid for those pixels. If
+                # the requested pixels fall over partial-coverage grid
+                # cells (the case when the input raster crosses a grid
+                # boundary, e.g. the Great Lakes Tile40 case), the
+                # evaluation returns nodata and the warp aborts with
+                # "Cannot determine source window". Materializing Pass 1
+                # to a flat GeoTIFF resolves all pixels eagerly, leaving
+                # Pass 2 to read a plain raster with no embedded
+                # transformer.
+                temp_pass1 = str(output_vrt).replace('.vrt', '_pass1.tif')
                 warp_kwargs_pass1 = {
-                    "format": "vrt",
+                    "format": "GTiff",
                     "outputType": gdal.gdalconst.GDT_Float32,
                     "warpOptions": wopt,
                     "errorThreshold": 0,
@@ -834,23 +911,47 @@ class Transformer():
                     "yRes": abs(yres),
                     "coordinateOperation": pipe,
                     "dstNodata": original_metadata["band_no_data"][0],
+                    "creationOptions": ["COMPRESS=DEFLATE", "TILED=YES"],
                 }
                 if not (crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps)):
                     warp_kwargs_pass1["outputBounds"] = cut_metadata["extent"]
                     warp_kwargs_pass1["width"] = int(cut_metadata["dimensions"].split("x")[0].strip())
                     warp_kwargs_pass1["height"] = int(cut_metadata["dimensions"].split("x")[1].strip())
 
-                ds_pass1 = gdal.Warp(temp_vrt_pass1, input_file, **warp_kwargs_pass1)
+                ds_pass1 = gdal.Warp(temp_pass1, input_file, **warp_kwargs_pass1)
 
-                # PASS 2: Expand geometry and apply mask
+                # PASS 2: Expand to the original input's pixel grid and
+                # apply the cutline as a mask only. Pass 1's output is
+                # already in the target CRS, so Pass 2 must not invoke any
+                # coordinate transformation. To prevent GDAL from inferring
+                # an unwanted pipeline (which can re-apply the vertical
+                # shift over partial-coverage grid regions and fail with
+                # "Cannot determine source window"), srcSRS and dstSRS are
+                # both explicitly set to the target CRS WKT so the warp is
+                # known to be an extent-only operation. cropToCutline is
+                # deliberately not set; with cropToCutline=True, GDAL
+                # overrides the explicit outputBounds with the cutline
+                # polygon's envelope, producing an output on a grid that
+                # does not match the input. Using cutlineDSName alone
+                # leaves outputBounds in charge and converts pixels
+                # outside the cutline polygon to dstNodata. srcNodata is
+                # set to the same value as dstNodata so Pass 1's filled
+                # NoData regions are treated as transparent during the
+                # expansion.
+                _pass2_crs_wkt = self.crs_to.to_wkt()
+                _pass2_nodata = original_metadata["band_no_data"][0]
                 warp_kwargs_pass2 = {
                     "format": "vrt",
                     "outputType": gdal.gdalconst.GDT_Float32,
+                    "errorThreshold": 0,
+                    "resampleAlg": "near",
                     "xRes": abs(xres),
                     "yRes": abs(yres),
                     "cutlineDSName": cutline_path,
-                    "cropToCutline": True,
-                    "dstNodata": original_metadata["band_no_data"][0],
+                    "srcSRS": _pass2_crs_wkt,
+                    "dstSRS": _pass2_crs_wkt,
+                    "srcNodata": _pass2_nodata,
+                    "dstNodata": _pass2_nodata,
                 }
 
                 if not (crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps)):
@@ -862,7 +963,6 @@ class Transformer():
                 ds = gdal.Warp(output_vrt, ds_pass1, **warp_kwargs_pass2)
 
             else:
-                print(">>>>>>>>>>>>>>>>>>> NO CUTLINE PATH <<<<<<<<<<<<<<<<<<<<<<<")
                 warp_kwargs = {
                     "format": "vrt",
                     "outputType": gdal.gdalconst.GDT_Float32,
@@ -877,7 +977,8 @@ class Transformer():
                     warp_kwargs["outputBounds"] = original_metadata["extent"]
                 ds = gdal.Warp(output_vrt, input_file, **warp_kwargs)
 
-            # FUSE might have already created a file with the same name, so we need to check
+            # FUSE might have already created a file with the same name; check
+            # for an existing output and rename to avoid overwriting it.
             if gdal.VSIStatL(output_file) is not None:
                 suffix = "_vyperdatum"
                 op = Path(output_file)
@@ -907,11 +1008,13 @@ class Transformer():
             output_ds = None
             ds = None
 
-            # Choose the correct reference file matching the current layout dimensions ---
-            if input_file_cut and os.path.exists(input_file_cut):
-                overwrite_with_original(input_file_cut, output_file)
-            else:
-                overwrite_with_original(original_input_file, output_file)
+            # Reference for non-elevation bands is always the original input.
+            # After the cutline-anchored two-pass warp, output dimensions
+            # match the original input exactly in the same-CRS case, so
+            # bands can be copied verbatim. In the different-CRS case,
+            # overwrite_with_original falls back to GDAL resampling and
+            # logs a warning (see its docstring).
+            overwrite_with_original(original_input_file, output_file)
 
             update_raster_wkt(output_file, self.crs_to.to_wkt())
             apply_nbs_band_standards(output_file)
@@ -978,7 +1081,7 @@ class Transformer():
                     except Exception as e:
                         logger.warning(f"Could not delete temporary file {path}. Exception: {str(e)}")
             safe_remove(output_vrt)
-            safe_remove(temp_vrt_pass1)
+            safe_remove(temp_pass1)
             safe_remove(cutline_path)
             safe_remove(input_file_cut)
             return success
