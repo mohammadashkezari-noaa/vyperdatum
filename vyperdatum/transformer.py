@@ -902,6 +902,9 @@ class Transformer():
                 # Pass 2 to read a plain raster with no embedded
                 # transformer.
                 temp_pass1 = str(output_vrt).replace('.vrt', '_pass1.tif')
+                cop = ["COMPRESS=DEFLATE", "TILED=YES"]
+                if original_metadata["driver"].lower() == "gtiff":
+                    cop.append("BIGTIFF=YES")                
                 warp_kwargs_pass1 = {
                     "format": "GTiff",
                     "outputType": gdal.gdalconst.GDT_Float32,
@@ -911,12 +914,16 @@ class Transformer():
                     "yRes": abs(yres),
                     "coordinateOperation": pipe,
                     "dstNodata": original_metadata["band_no_data"][0],
-                    "creationOptions": ["COMPRESS=DEFLATE", "TILED=YES"],
+                    "creationOptions": cop,
                 }
                 if not (crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps)):
                     warp_kwargs_pass1["outputBounds"] = cut_metadata["extent"]
-                    warp_kwargs_pass1["width"] = int(cut_metadata["dimensions"].split("x")[0].strip())
-                    warp_kwargs_pass1["height"] = int(cut_metadata["dimensions"].split("x")[1].strip())
+                    dims = cut_metadata.get("dimensions")
+                    if dims and "x" in str(dims):
+                        warp_kwargs_pass1["width"] = int(str(dims).split("x")[0].strip())
+                        warp_kwargs_pass1["height"] = int(str(dims).split("x")[1].strip())
+                    else:
+                        raise ValueError(f"Aborting: Cut metadata dimensions are invalid or empty for Pass 1 processing.")                    
 
                 ds_pass1 = gdal.Warp(temp_pass1, input_file, **warp_kwargs_pass1)
 
@@ -956,8 +963,12 @@ class Transformer():
 
                 if not (crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps)):
                     warp_kwargs_pass2["outputBounds"] = original_metadata["extent"]
-                    warp_kwargs_pass2["width"] = int(original_metadata["dimensions"].split("x")[0].strip())
-                    warp_kwargs_pass2["height"] = int(original_metadata["dimensions"].split("x")[1].strip())
+                    dims = original_metadata.get("dimensions")
+                    if dims and "x" in str(dims):
+                        warp_kwargs_pass2["width"] = int(str(dims).split("x")[0].strip())
+                        warp_kwargs_pass2["height"] = int(str(dims).split("x")[1].strip())
+                    else:
+                        raise ValueError(f"Aborting: Original metadata dimensions are invalid or empty for Pass 2 processing.")
 
                 # Warp the output of Pass 1 (no coordinateOperation needed, it's already transformed)
                 ds = gdal.Warp(output_vrt, ds_pass1, **warp_kwargs_pass2)
@@ -987,7 +998,7 @@ class Transformer():
 
             cop = ["COMPRESS=DEFLATE"]
             if input_metadata["driver"].lower() == "gtiff":
-                cop.append("TILED=YES")
+                cop.extend(["TILED=YES", "BIGTIFF=YES"])
             if input_metadata["driver"].lower() == "bag":
                 try:
                     block_size = min(int(input_metadata["block_size"][0][0]),

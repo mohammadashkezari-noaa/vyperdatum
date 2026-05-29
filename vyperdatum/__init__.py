@@ -5,6 +5,13 @@ import pathlib
 import json
 import time
 import logging.config
+
+
+os.environ["PROJ_NETWORK"] = "ON"
+_vyper_grids_dir = os.environ.get("VYPER_GRIDS")
+if _vyper_grids_dir:
+    os.environ.setdefault("PROJ_USER_WRITABLE_DIRECTORY", _vyper_grids_dir)
+
 from osgeo import gdal
 import pyproj as pp
 pp.network.set_network_enabled(True)
@@ -62,7 +69,6 @@ log_configuration_dict = json.load(
 logging.config.dictConfig(log_configuration_dict)
 logging.Formatter.converter = time.gmtime
 
-os.environ.update(PROJ_NETWORK="ON")
 gdal.UseExceptions()
 
 
@@ -73,3 +79,9 @@ validate_vyper_grids()
 db = DB(db_dir=PROJDB.DIR.value)
 assert "NOAA" in pp.database.get_authorities(), ("The authority 'NOAA' not found in proj.db. "
                                                  "Check if the latest database is used.")
+
+logger.info(
+    "PROJ network mode: %s; writable dir: %s",
+    pp.network.is_network_enabled(),
+    pp.datadir.get_user_data_dir(),
+)

@@ -600,7 +600,8 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
             w_in, h_in, w_out, h_out,
         )
 
-    mem_path = f"/vsimem/{os.path.splitext(os.path.basename(output_file))[0]}.tiff"
+    # mem_path = f"/vsimem/{os.path.splitext(os.path.basename(output_file))[0]}.tiff"
+    mem_path = output_file + ".vsimem_fallback.tmp"
     ds_temp = driver.Create(
         mem_path,
         w_out,
@@ -669,7 +670,7 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
 
     cop = ["COMPRESS=DEFLATE"]
     if input_metadata["driver"].lower() == "gtiff":
-        cop.extend(["TILED=YES"])
+        cop.extend(["TILED=YES", "BIGTIFF=YES"])
 
     gdal.Translate(
         output_file,
@@ -680,7 +681,9 @@ def overwrite_with_original(input_file: str, output_file: str) -> None:
     )
 
     ds_temp = None
-    gdal.Unlink(mem_path)
+    # gdal.Unlink(mem_path)
+    if os.path.exists(mem_path):
+        os.remove(mem_path)    
 
 def update_stats(input_file):
     """
@@ -785,7 +788,7 @@ def add_uncertainty_band(input_file: str) -> None:
 
     cop = ["COMPRESS=DEFLATE"]
     if input_metadata["driver"].lower() == "gtiff":
-        cop.extend(["TILED=YES", "BIGTIFF=IF_SAFER"])
+        cop.extend(["TILED=YES", "BIGTIFF=YES"])
     gdal.Translate(
         destName=input_file,
         srcDS=tmp_uncompressed_path,
@@ -1276,6 +1279,11 @@ def clip_raster_to_cutline(input_path: str, cutline_path: str, output_path: str)
             max(out_ymin, out_ymax),
         )
 
+        
+        input_metadata = raster_metadata(input_path)
+        cop = ["COMPRESS=DEFLATE", "TILED=YES"]
+        if input_metadata["driver"].lower() == "gtiff":
+            cop.append("BIGTIFF=YES")
         warp_options = gdal.WarpOptions(
             format="GTiff",
             cutlineDSName=cutline_path,
@@ -1286,7 +1294,7 @@ def clip_raster_to_cutline(input_path: str, cutline_path: str, output_path: str)
             outputBounds=output_bounds,
             resampleAlg="near",
             errorThreshold=0,
-            creationOptions=["COMPRESS=DEFLATE", "TILED=YES"],
+            creationOptions=cop,
         )
 
         ds_out = gdal.Warp(output_path, ds_in, options=warp_options)

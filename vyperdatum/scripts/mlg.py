@@ -104,7 +104,35 @@ class XYZ:
         return
 
 
+    def to_geoparquet(self,
+                      crs: str,
+                      output_file: str) -> None:
+            """
+            Exports the transformed data to a GeoParquet file.
+            
+            Parameters:
+            -----------
+                crs (str): The coordinate reference system of the transformed coordinates.
+                output_file (str): Path to the output .parquet file.
+            """
+            if "x_t" not in self.df.columns:
+                raise ValueError("Data must be transformed using transform() before exporting.")
 
+            data = {
+                "x": self.df["x_t"].values,
+                "y": self.df["y_t"].values,
+                "elevation": self.df["z_t"].values,
+                "uncertainty": self.df["uncertainty"].values
+            }
+            
+            geometry = gpd.points_from_xy(
+                x=data["x"], 
+                y=data["y"], 
+                z=data["elevation"]
+            )
+            
+            gdf = gpd.GeoDataFrame(data, geometry=geometry, crs=crs)
+            gdf.to_parquet(output_file)
 
 
 
