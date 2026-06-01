@@ -28,9 +28,88 @@ from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
 
-# os.environ["CPL_DEBUG"] = "ON"
-# os.environ["CPL_LOG_ERRORS"] = "ON"
-# os.environ["PROJ_DEBUG"] = "3"
+os.environ["CPL_DEBUG"] = "ON"
+os.environ["CPL_LOG_ERRORS"] = "ON"
+os.environ["PROJ_DEBUG"] = "3"
+
+
+# Pass 1 tiling
+PASS1_TILED_PIXEL_THRESHOLD = 250_000_000
+PASS1_DEFAULT_TILE_SIZE = 4096
+
+
+def _pass1_warp_tiled(input_file, output_vrt_path, warp_kwargs_template,
+                      cut_metadata, tile_size):
+    """Run Pass 1 as a tiled warp.
+
+    Writes one GeoTIFF per tile into a subdirectory next to
+    ``output_vrt_path``, then builds a VRT mosaic referencing the tiles
+    at ``output_vrt_path``. Returns the path to the tiles subdirectory
+    so the caller can clean it up.
+
+    On any tile failure, all tiles written so far and the subdirectory
+    are removed and the exception is re-raised.
+    """
+    minx, miny, maxx, maxy = cut_metadata["extent"]
+    W, H = (int(s.strip()) for s in str(cut_metadata["dimensions"]).split("x"))
+    xres = (maxx - minx) / W
+    yres = (maxy - miny) / H
+
+    tiles_dir = Path(output_vrt_path).parent / f"{Path(output_vrt_path).stem}_tiles"
+    tiles_dir.mkdir(parents=True, exist_ok=True)
+
+    n_tiles_x = (W + tile_size - 1) // tile_size
+    n_tiles_y = (H + tile_size - 1) // tile_size
+    total_tiles = n_tiles_x * n_tiles_y
+    logger.info(f"Pass 1 tiled mode: {W}x{H} pixels -> {n_tiles_x}x{n_tiles_y} = {total_tiles} tiles (up to {tile_size}px each)")
+
+    tile_paths = []
+    try:
+        for tj in range(n_tiles_y):
+            for ti in range(n_tiles_x):
+                px0 = ti * tile_size
+                py0 = tj * tile_size
+                px1 = min((ti + 1) * tile_size, W)
+                py1 = min((tj + 1) * tile_size, H)
+                tw = px1 - px0
+                th = py1 - py0
+                tile_minx = minx + px0 * xres
+                tile_maxx = minx + px1 * xres
+                tile_maxy = maxy - py0 * yres
+                tile_miny = maxy - py1 * yres
+
+                tile_path = str(tiles_dir / f"tile_{ti:04d}_{tj:04d}.tif")
+                kw = dict(warp_kwargs_template)
+                kw["outputBounds"] = (tile_minx, tile_miny, tile_maxx, tile_maxy)
+                kw["width"] = tw
+                kw["height"] = th
+
+                idx = tj * n_tiles_x + ti + 1
+                logger.info(f"Pass 1 tile {idx}/{total_tiles}: {tw}x{th} px at pixel ({px0},{py0})")
+                tds = gdal.Warp(tile_path, input_file, **kw)
+                if tds is None:
+                    raise RuntimeError(f"Pass 1 tile warp returned None for tile ({ti},{tj})")
+                tds = None
+                tile_paths.append(tile_path)
+
+        vrt_ds = gdal.BuildVRT(output_vrt_path, tile_paths)
+        if vrt_ds is None:
+            raise RuntimeError("BuildVRT returned None for Pass 1 tile mosaic")
+        vrt_ds = None
+        return tiles_dir
+    except Exception:
+        for tp in tile_paths:
+            try:
+                if os.path.exists(tp):
+                    os.remove(tp)
+            except Exception as e:
+                logger.warning(f"Could not delete partial tile {tp}: {e}")
+        try:
+            if tiles_dir.exists():
+                shutil.rmtree(str(tiles_dir))
+        except Exception as e:
+            logger.warning(f"Could not remove tiles directory {tiles_dir}: {e}")
+        raise
 
 
 class Transformer():
@@ -725,7 +804,7 @@ class Transformer():
     def transform_raster(self,
                          input_file: str,
                          output_file: str,
-                         overview: bool = False,
+                         overview: bool = True,
                          pre_post_checks: bool = True,
                          vdatum_check: bool = True,
                          _allow_different_horizontal_crs: bool = False,
@@ -837,6 +916,7 @@ class Transformer():
             ds_pass1 = None
             output_ds = None
             temp_pass1 = None
+            tiles_dir = None
             if not str(output_file).lower().startswith("/vsimem/"):
                 pathlib.Path(os.path.split(output_file)[0]).mkdir(parents=True, exist_ok=True)
             input_metadata = raster_metadata(input_file)
@@ -916,16 +996,33 @@ class Transformer():
                     "dstNodata": original_metadata["band_no_data"][0],
                     "creationOptions": cop,
                 }
-                if not (crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps)):
-                    warp_kwargs_pass1["outputBounds"] = cut_metadata["extent"]
+
+                same_crs_branch = not (crs_utils.multiple_geodetic_crs(self.steps) or crs_utils.multiple_projections(self.steps))
+                cut_W, cut_H = 0, 0
+                if same_crs_branch:
                     dims = cut_metadata.get("dimensions")
                     if dims and "x" in str(dims):
-                        warp_kwargs_pass1["width"] = int(str(dims).split("x")[0].strip())
-                        warp_kwargs_pass1["height"] = int(str(dims).split("x")[1].strip())
+                        cut_W = int(str(dims).split("x")[0].strip())
+                        cut_H = int(str(dims).split("x")[1].strip())
                     else:
-                        raise ValueError(f"Aborting: Cut metadata dimensions are invalid or empty for Pass 1 processing.")                    
+                        raise ValueError(f"Aborting: Cut metadata dimensions are invalid or empty for Pass 1 processing.")
 
-                ds_pass1 = gdal.Warp(temp_pass1, input_file, **warp_kwargs_pass1)
+                tile_size = int(os.environ.get("VYPER_PASS1_TILE_SIZE", str(PASS1_DEFAULT_TILE_SIZE)))
+                use_tiled_pass1 = same_crs_branch and (cut_W * cut_H > PASS1_TILED_PIXEL_THRESHOLD)
+
+                if use_tiled_pass1:
+                    temp_pass1 = str(output_vrt).replace('.vrt', '_pass1.vrt')
+                    tiles_dir = _pass1_warp_tiled(input_file, temp_pass1, warp_kwargs_pass1,
+                                                  cut_metadata, tile_size)
+                    ds_pass1 = gdal.Open(temp_pass1)
+                    if ds_pass1 is None:
+                        raise RuntimeError(f"Could not open Pass 1 VRT mosaic: {temp_pass1}")
+                else:
+                    if same_crs_branch:
+                        warp_kwargs_pass1["outputBounds"] = cut_metadata["extent"]
+                        warp_kwargs_pass1["width"] = cut_W
+                        warp_kwargs_pass1["height"] = cut_H
+                    ds_pass1 = gdal.Warp(temp_pass1, input_file, **warp_kwargs_pass1)
 
                 # PASS 2: Expand to the original input's pixel grid and
                 # apply the cutline as a mask only. Pass 1's output is
@@ -999,6 +1096,13 @@ class Transformer():
             cop = ["COMPRESS=DEFLATE"]
             if input_metadata["driver"].lower() == "gtiff":
                 cop.extend(["TILED=YES", "BIGTIFF=YES"])
+                try:
+                    bx, by = input_metadata["block_size"][0]
+                    cop.extend([f"BLOCKXSIZE={int(bx)}", f"BLOCKYSIZE={int(by)}"])
+                except Exception as e:
+                    logger.warning("Could not parse block size from input raster metadata. "
+                                   f"Found invalid block_size value: {input_metadata.get('block_size')}."
+                                   f"\n Exception: {str(e)}")
             if input_metadata["driver"].lower() == "bag":
                 try:
                     block_size = min(int(input_metadata["block_size"][0][0]),
@@ -1067,11 +1171,10 @@ class Transformer():
                     logger.info(f"{Fore.RED}VDatum API outputs stored at: {csv_path}")
                     print(Style.RESET_ALL)
 
-            # if overview and input_metadata["driver"].lower() == "gtiff":
-            #     raster_utils.add_overview(raster_file=output_file,
-            #                               compression=input_metadata["compression"]
-            #                               )
-            #     # raster_utils.add_rat(output_file)
+            if overview and input_metadata["driver"].lower() == "gtiff":
+                raster_utils.add_overview(raster_file=output_file,
+                                          compression="DEFLATE"
+                                          )
 
         except Exception as e:
             out_dir = Path(output_file).parent.absolute()
@@ -1095,6 +1198,12 @@ class Transformer():
             safe_remove(temp_pass1)
             safe_remove(cutline_path)
             safe_remove(input_file_cut)
+            if tiles_dir is not None:
+                try:
+                    if Path(str(tiles_dir)).exists():
+                        shutil.rmtree(str(tiles_dir))
+                except Exception as e:
+                    logger.warning(f"Could not delete Pass 1 tiles directory {tiles_dir}. Exception: {str(e)}")
             return success
 
     def transform_vector(self,

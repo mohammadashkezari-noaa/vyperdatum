@@ -111,26 +111,60 @@ def raster_metadata(raster_file: str, verbose: bool = False) -> dict:
     return metadata
 
 
-def add_overview(raster_file: str, compression: str = "", embedded: bool = True) -> None:
+def add_overview(raster_file: str, compression: str = "", embedded: bool = True,
+                 levels=None, resampling: str = "AVERAGE") -> None:
     """
-    Add overview bands to a raster file with no existing overviews.
+    Add overview bands to a raster file.
 
     parameters
     ----------
     raster_file: str
         Absolute full path to the raster file.
     compression: str
-        The name of compression algorithm.
+        The name of compression algorithm (e.g. ``DEFLATE``, ``LZW``).
+        For float rasters compressed with DEFLATE or LZW, ``PREDICTOR=3``
+        is set so the overview pyramid compresses as efficiently as the
+        original. Empty string leaves compression at GDAL defaults.
     embedded: bool, default=True
-        If True, the overviews will be embedded in the file, otherwise stored externally.
+        If True the overviews are embedded in the file, otherwise stored
+        externally as a .ovr sidecar.
+    levels: list[int] | None, default=None
+        Overview decimation factors. When None, an automatic pyramid is
+        derived from the raster's longer side so the smallest level is
+        no larger than approximately 256 pixels along its longer axis.
+        For typical bathymetric tiles this produces seven to eight
+        levels (e.g. 2, 4, 8, 16, 32, 64, 128).
+    resampling: str, default="AVERAGE"
+        Resampling algorithm. AVERAGE is appropriate for continuous data
+        such as elevation; NEAREST is appropriate for categorical bands
+        such as a contributor identifier raster.
     """
+    ds = None
+    set_predictor = False
     try:
         ds = gdal.Open(raster_file, gdal.GA_Update if embedded else gdal.GA_ReadOnly)
+        if levels is None:
+            longer_side = max(ds.RasterXSize, ds.RasterYSize)
+            levels = []
+            f = 2
+            while longer_side // f > 256:
+                levels.append(f)
+                f *= 2
+            if not levels:
+                levels = [2]
         if compression:
             gdal.SetConfigOption("COMPRESS_OVERVIEW", compression)
+            first_band = ds.GetRasterBand(1)
+            if compression.upper() in ("DEFLATE", "LZW") and first_band.DataType in (gdal.GDT_Float32, gdal.GDT_Float64):
+                gdal.SetConfigOption("PREDICTOR_OVERVIEW", "3")
+                set_predictor = True
+        ds.BuildOverviews(resampling, levels, gdal.TermProgress_nocb)
     finally:
-        ds.BuildOverviews("NEAREST", [2, 4, 16], gdal.TermProgress_nocb)
         ds = None
+        if compression:
+            gdal.SetConfigOption("COMPRESS_OVERVIEW", None)
+        if set_predictor:
+            gdal.SetConfigOption("PREDICTOR_OVERVIEW", None)
     return
 
 
