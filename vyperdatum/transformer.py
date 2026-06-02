@@ -28,9 +28,9 @@ from vyperdatum.pipeline import nwld_ITRF2020_steps, nwld_NAD832011_steps
 logger = logging.getLogger("root_logger")
 gdal.UseExceptions()
 
-os.environ["CPL_DEBUG"] = "ON"
-os.environ["CPL_LOG_ERRORS"] = "ON"
-os.environ["PROJ_DEBUG"] = "3"
+# os.environ["CPL_DEBUG"] = "ON"
+# os.environ["CPL_LOG_ERRORS"] = "ON"
+# os.environ["PROJ_DEBUG"] = "3"
 
 
 # Pass 1 tiling
@@ -396,7 +396,7 @@ class Transformer():
             accessible (either locally or through network).
             Note that the default value for this option can be also set with the
             :envvar:`PROJ_ONLY_BEST_DEFAULT` environment variable, or with the
-            ``only_best_default`` setting of :ref:`proj-ini`.
+            ``only_best_default`` setting of the ``proj.ini`` file.
             The only_best kwarg overrides the default value if set.
             Requires PROJ 9.2+.
 
