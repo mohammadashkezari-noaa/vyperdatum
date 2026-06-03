@@ -32,6 +32,11 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+html_logo = "_static/vyperdatum-logo-light.svg"
+html_favicon = "_static/vyperdatum-icon.svg"
+html_theme_options = {
+    "logo_only": True,
+}
 
 # AutoAPI: the package source is parsed statically, so importing
 # vyperdatum (which validates VYPER_GRIDS at import time) is not

@@ -140,20 +140,13 @@ input_file = r"C:\Users\mohammad.ashkezari\Documents\projects\vyperdatum\untrack
 crs_from = "EPSG:3452+NOAA:66"
 crs_to = "EPSG:6344+NOAA:101"  
 
-### REMOVE THIS BLOCK< JUST TESTING
-crs_from = "ESRI:103295+NOAA:25086"   
-crs_to = "EPSG:6344+NOAA:101"  
-
 # steps = [{'crs_from': 'EPSG:3452', 'crs_to': 'EPSG:4269', 'v_shift': False},
 #          {'crs_from': 'EPSG:6318+NOAA:66', 'crs_to': 'EPSG:6318+NOAA:86', 'v_shift': True},
 #          {'crs_from': 'EPSG:6318+NOAA:86', 'crs_to': 'EPSG:6318+NOAA:101', 'v_shift': True},
 #          {'crs_from': 'EPSG:6318', 'crs_to': 'EPSG:6344', 'v_shift': False}
 #          ]
 
-xyz = XYZ(input_file=input_file,
-        #   skiprows=15,
-        #   col_names=["xi", "yi", "zi"]
-          )
+xyz = XYZ(input_file=input_file)
 df = xyz.transform(crs_from=crs_from, crs_to=crs_to,
                 #    steps=steps
                    )
