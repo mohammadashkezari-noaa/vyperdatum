@@ -1098,7 +1098,10 @@ class Transformer():
                 cop.extend(["TILED=YES", "BIGTIFF=YES"])
                 try:
                     bx, by = input_metadata["block_size"][0]
-                    cop.extend([f"BLOCKXSIZE={int(bx)}", f"BLOCKYSIZE={int(by)}"])
+                    if by > 1 and bx % 16 == 0 and by % 16 == 0:
+                        cop.extend([f"BLOCKXSIZE={int(bx)}", f"BLOCKYSIZE={int(by)}"])
+                    else:
+                        cop.extend([f"BLOCKXSIZE=256", f"BLOCKYSIZE=256"])
                 except Exception as e:
                     logger.warning("Could not parse block size from input raster metadata. "
                                    f"Found invalid block_size value: {input_metadata.get('block_size')}."
